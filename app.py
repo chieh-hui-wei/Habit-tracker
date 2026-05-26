@@ -18,7 +18,7 @@ load_dotenv()
 # ----------------------
 # Configuration (Recommended: set these as environment variables)
 PROJECT_ID = os.environ.get("BQ_PROJECT_ID")
-DATASET_ID = os.environ.get("BQ_DATASET_ID", )
+DATASET_ID = os.environ.get("BQ_DATASET_ID")
 TABLE_ID = f"{PROJECT_ID}.{DATASET_ID}.habit_logs"
 credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 
