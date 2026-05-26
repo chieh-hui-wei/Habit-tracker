@@ -9,7 +9,7 @@ from google.oauth2 import service_account
 import uuid
 from zoneinfo import ZoneInfo
 # pyrefly: ignore [missing-import]
-from python_dotenv import load_dotenv
+from dotenv import load_dotenv
 
 load_dotenv()
 
