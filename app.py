@@ -8,13 +8,17 @@ from google.api_core.exceptions import NotFound
 from google.oauth2 import service_account
 import uuid
 from zoneinfo import ZoneInfo
+# pyrefly: ignore [missing-import]
+from python_dotenv import load_dotenv
+
+load_dotenv()
 
 # ----------------------
 # BIGQUERY SETUP
 # ----------------------
 # Configuration (Recommended: set these as environment variables)
-PROJECT_ID = os.environ.get("BQ_PROJECT_ID", "vm-20260413")
-DATASET_ID = os.environ.get("BQ_DATASET_ID", "habit")
+PROJECT_ID = os.environ.get("BQ_PROJECT_ID")
+DATASET_ID = os.environ.get("BQ_DATASET_ID", )
 TABLE_ID = f"{PROJECT_ID}.{DATASET_ID}.habit_logs"
 credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 
