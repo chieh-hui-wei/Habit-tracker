@@ -327,34 +327,242 @@ def insert_manual_habit(habit_name, detail, start_str, end_str):
 
 
 # ----------------------
+# HABIT LIST MANAGEMENT
+# ----------------------
+HABITS_FILE = "habits.json"
+DEFAULT_HABITS = ["健身", "閱讀", "烏克麗麗", "吉他", "冥想", "走路", "讀經文"]
+
+
+def load_habits():
+    import json
+    if os.path.exists(HABITS_FILE):
+        try:
+            with open(HABITS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return DEFAULT_HABITS
+    else:
+        try:
+            with open(HABITS_FILE, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_HABITS, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
+        return DEFAULT_HABITS
+
+
+def save_habits(habits):
+    import json
+    try:
+        with open(HABITS_FILE, "w", encoding="utf-8") as f:
+            json.dump(habits, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"Error saving habits: {e}")
+
+
+def add_habit_fn(new_habit):
+    new_habit = new_habit.strip()
+    if not new_habit:
+        current = load_habits()
+        return (
+            gr.Dropdown(choices=current),
+            gr.Dropdown(choices=current),
+            "",
+            "❌ Habit name cannot be empty.",
+        )
+
+    habits = load_habits()
+    if new_habit in habits:
+        return (
+            gr.Dropdown(choices=habits),
+            gr.Dropdown(choices=habits),
+            "",
+            "⚠️ Habit already exists in the list.",
+        )
+
+    habits.append(new_habit)
+    save_habits(habits)
+    return (
+        gr.Dropdown(choices=habits, value=new_habit),
+        gr.Dropdown(choices=habits),
+        "",
+        f"✅ Successfully added habit: '{new_habit}'",
+    )
+
+
+def delete_habit_fn(habit_to_delete):
+    if not habit_to_delete:
+        current = load_habits()
+        return (
+            gr.Dropdown(choices=current),
+            gr.Dropdown(choices=current),
+            "❌ Please select a habit to delete.",
+        )
+
+    habits = load_habits()
+    if habit_to_delete not in habits:
+        return (
+            gr.Dropdown(choices=habits),
+            gr.Dropdown(choices=habits),
+            f"❌ Habit '{habit_to_delete}' not found.",
+        )
+
+    habits.remove(habit_to_delete)
+    save_habits(habits)
+    return (
+        gr.Dropdown(choices=habits, value=None),
+        gr.Dropdown(choices=habits, value=None),
+        f"🗑️ Successfully deleted habit: '{habit_to_delete}'",
+    )
+
+
+# ----------------------
 # UI
 # ----------------------
-with gr.Blocks() as app:
-    gr.Markdown("# 🧠 Habit Tracker")
+custom_css = """
+.header-container {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    padding: 2.5rem 2rem;
+    border-radius: 16px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.15);
+    margin-bottom: 2rem;
+}
+.header-container h1 {
+    font-size: 2.6rem;
+    font-weight: 800;
+    margin: 0 0 0.5rem 0;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+}
+.header-container p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0;
+    font-weight: 400;
+}
+.custom-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1.5rem !important;
+}
+.dark .custom-card {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+"""
 
-    with gr.Row():
-        habit_input = gr.Dropdown(
-            choices=["健身", "閱讀", "烏克麗麗", "吉他", "冥想", "走路"],
-            label="Habit Name",
-        )
-        detail = gr.Textbox(label="Detail (書名/訓練部位/歌曲)")
-    with gr.Row():
-        with gr.Column():
-            gr.Markdown("## Track automatically")
-            with gr.Row():
-                with gr.Column():
-                    start_btn = gr.Button("Start")
-                    stop_btn = gr.Button("Stop")
-        with gr.Column():
-            gr.Markdown("## Manual Entry")
-            with gr.Row():
-                manual_start = gr.Textbox(label="Start Time (YYYY-MM-DD HH:MM)")
-                manual_end = gr.Textbox(label="End Time (YYYY-MM-DD HH:MM)")
+theme = gr.themes.Soft(
+    primary_hue="indigo",
+    secondary_hue="blue",
+    neutral_hue="slate",
+    font=[gr.themes.GoogleFont("Outfit"), "sans-serif"],
+).set(
+    button_primary_background_fill="linear-gradient(90deg, #6366f1, #3b82f6)",
+    button_primary_background_fill_hover="linear-gradient(90deg, #4f46e5, #2563eb)",
+    button_primary_text_color="white",
+    block_title_text_weight="600",
+    block_border_width="1px",
+    block_shadow="0 4px 6px -1px rgba(0, 0, 0, 0.05)",
+)
 
-            manual_submit = gr.Button("Submit")
+with gr.Blocks(theme=theme, css=custom_css) as app:
+    gr.HTML(
+        """
+        <div class="header-container">
+            <h1>🧠 Habit Tracker</h1>
+            <p>Track your daily habits, visualize your dedication, and build a better version of yourself.</p>
+        </div>
+        """
+    )
 
-    status = gr.Textbox(label="Status")
+    initial_habits = load_habits()
 
+    with gr.Row(equal_height=False):
+        # LEFT COLUMN: Log Current Activity & Track Automatically
+        with gr.Column(scale=2, min_width=350):
+            with gr.Group(elem_classes="custom-card"):
+                gr.Markdown("### 📍 Log Current Activity")
+                habit_input = gr.Dropdown(
+                    choices=initial_habits,
+                    label="Habit Name",
+                    value=initial_habits[0] if initial_habits else None,
+                    interactive=True
+                )
+                detail = gr.Textbox(
+                    label="Detail",
+                    placeholder="e.g. Book name, workout muscle, song...",
+                )
+
+            with gr.Group(elem_classes="custom-card"):
+                gr.Markdown("### ⏱️ Track Automatically")
+                with gr.Row():
+                    start_btn = gr.Button("▶️ Start Session", variant="primary")
+                    stop_btn = gr.Button("⏹️ Stop & Save", variant="stop")
+
+            with gr.Group(elem_classes="custom-card"):
+                gr.Markdown("### ✍️ Manual Entry")
+                manual_start = gr.Textbox(
+                    label="Start Time",
+                    placeholder="YYYY-MM-DD HH:MM",
+                )
+                manual_end = gr.Textbox(
+                    label="End Time",
+                    placeholder="YYYY-MM-DD HH:MM",
+                )
+                manual_submit = gr.Button("📥 Submit Manual Entry", variant="secondary")
+
+            status = gr.Textbox(
+                label="System Status",
+                value="System idle...",
+                interactive=False
+            )
+
+        # RIGHT COLUMN: Report & Logs & Settings
+        with gr.Column(scale=3, min_width=450):
+            with gr.Tabs():
+                with gr.TabItem("📊 Report Chart"):
+                    with gr.Group(elem_classes="custom-card"):
+                        gr.Markdown("### 📈 Time Spent Visualization")
+                        with gr.Row():
+                            period = gr.Radio(
+                                choices=["week", "month"],
+                                value="week",
+                                label="Time Period",
+                                interactive=True
+                            )
+                            plot_btn = gr.Button("🔄 Generate Chart", variant="primary")
+                        plot_output = gr.Plot(label="Time Distribution")
+
+                with gr.TabItem("📋 Detailed Logs"):
+                    with gr.Group(elem_classes="custom-card"):
+                        gr.Markdown("### 🕒 Recently Logged Habits")
+                        load_btn = gr.Button("🔄 Refresh Logs Table", variant="primary")
+                        table = gr.Dataframe(interactive=False)
+
+                with gr.TabItem("⚙️ Habit List Settings"):
+                    with gr.Group(elem_classes="custom-card"):
+                        gr.Markdown("### 🛠️ Add or Remove Habit Options")
+                        with gr.Row():
+                            with gr.Column():
+                                new_habit_input = gr.Textbox(
+                                    label="Add New Habit Option",
+                                    placeholder="e.g. 寫程式, 慢跑, 瑜伽...",
+                                )
+                                add_habit_btn = gr.Button("➕ Add to List", variant="primary")
+                            with gr.Column():
+                                delete_habit_dropdown = gr.Dropdown(
+                                    choices=initial_habits,
+                                    label="Select Habit to Remove",
+                                )
+                                delete_habit_btn = gr.Button("🗑️ Remove from List", variant="stop")
+                        manage_status = gr.Markdown()
+
+    # Event handlers
     start_btn.click(start_habit, inputs=[habit_input, detail], outputs=status)
     stop_btn.click(stop_habit, outputs=status)
 
@@ -364,22 +572,19 @@ with gr.Blocks() as app:
         outputs=status,
     )
 
-    gr.Markdown("## 📋 Logs")
-    load_btn = gr.Button("Refresh Logs")
-    table = gr.Dataframe()
+    add_habit_btn.click(
+        fn=add_habit_fn,
+        inputs=[new_habit_input],
+        outputs=[habit_input, delete_habit_dropdown, new_habit_input, manage_status],
+    )
+
+    delete_habit_btn.click(
+        fn=delete_habit_fn,
+        inputs=[delete_habit_dropdown],
+        outputs=[habit_input, delete_habit_dropdown, manage_status],
+    )
 
     load_btn.click(load_data, outputs=table)
-
-    gr.Markdown("## 📊 Report")
-    period = gr.Radio(["week", "month"], value="week")
-    # report_btn = gr.Button("Generate Report")
-    # report_table = gr.Dataframe()
-
-    # report_btn.click(get_report, inputs=period, outputs=report_table)
-
-    plot_btn = gr.Button("📊 Show Report Chart")
-    plot_output = gr.Plot()
-
     plot_btn.click(fn=plot_report, inputs=period, outputs=plot_output)
 
 # ----------------------
