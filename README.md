@@ -1,32 +1,22 @@
 # 🧠 Habit Tracker
 
-An enterprise-grade, high-performance personal habit tracker built with **Gradio** and **Google BigQuery**. It features a modern two-column SaaS analytics layout, dynamic habit choices management with local persistence, automatic session timing, manual time logging, and beautiful Matplotlib analytics charts.
+A personal habit tracker built with **Gradio** and **Google BigQuery**. It features a modern two-column SaaS analytics layout, dynamic habit choices management with local persistence, automatic session timing, manual time logging, and beautiful Matplotlib analytics charts.
 
 ---
 
-## ✨ Features
-
-### 🎨 Beautiful, Modern SaaS UI
-* **Two-Column Grid Layout**:
-  * **Left Side (Control Room)**: Log current activities, initiate automatic track sessions (Start/Stop), enter manual historical logs, and monitor system status.
-  * **Right Side (Analytics & Config)**: A tabbed interface with:
-    * **📊 Report Chart**: Dynamic weekly/monthly hour visualization with custom Chinese unicode font support.
-    * **📋 Detailed Logs**: Quick spreadsheet table viewing recent habits logged in the last 7 days.
-    * **⚙️ Habit List Settings**: Dynamically add and remove habit choices.
-* **Aesthetic Theme**: Styled using custom CSS, a premium **Gradio Soft Theme** in Indigo/Blue hues, elegant **Outfit** typography, and a glowing gradient header banner. Full light/dark mode support.
-
-### ⚙️ Flexible Choice Management
+## Features
+### Flexible Choice Management
 * **Dynamic Editing**: Easily add or delete habits directly from the web browser under the **Habit List Settings** tab.
 * **Persistent Storage**: Dynamic changes are persisted locally in `habits.json` and synchronized across all dropdowns instantly.
 
-### 📊 BigQuery Performance Architecture
+### BigQuery Performance Architecture
 * **Daily Partitioning**: Optimized BigQuery schema partitioned on `start_time` to dramatically reduce query costs over large historical sets.
 * **Clustering by Habit**: Clustered on `habit_name` to make group-by aggregations and habit-specific searches ultra-fast.
 * **Buffered Insertion**: Handled via rapid JSON streaming insertions.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -54,14 +44,13 @@ An enterprise-grade, high-performance personal habit tracker built with **Gradio
 3. **Configure Environment Variables**:
    Set up your GCP BigQuery configurations (e.g. in your `.env` or shell profile):
    ```bash
-   export BQ_PROJECT_ID="your-gcp-project-id"
-   export BQ_DATASET_ID="habit"
-   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account-key.json"
+   cp .env.example .env
    ```
+   Edit `.env` with your GCP credentials.
 
 ---
 
-## 🛠️ Usage
+## Usage
 
 ### Running the App
 
@@ -74,16 +63,16 @@ Open the local URL printed in your terminal (usually `http://127.0.0.1:7860`).
 ### Dashboard Guide
 
 1. **Start Tracking automatically**:
-   Select a habit from the dropdown (e.g., `健身`), add any details (e.g., `Leg Day`), and click **▶️ Start Session**. When you are finished, click **⏹️ Stop & Save** to automatically compute the duration and log it to BigQuery.
+   Select a habit from the dropdown (e.g., `健身`), add any details (e.g., `Leg Day`), and click **Start Session**. When you are finished, click **Stop & Save** to automatically compute the duration and log it to BigQuery.
 2. **Submit Manual Entries**:
-   Input a start time and end time matching `YYYY-MM-DD HH:MM` and click **📥 Submit Manual Entry**.
+   Input a start time and end time matching `YYYY-MM-DD HH:MM` and click **Submit Manual Entry**.
 3. **Customize your Habits list**:
-   Navigate to the **⚙️ Habit List Settings** tab. Use the left column to add new habits (e.g., `寫程式`), or the right dropdown to remove choices you no longer need.
+   Navigate to the **Habit List Settings** tab. Use the left column to add new habits (e.g., `寫程式`), or the right dropdown to remove choices you no longer need.
 4. **View Logs & Charts**:
-   Under the **📊 Report Chart** tab, select a timeframe (week/month) and click **🔄 Generate Chart** to update the Matplotlib time distribution. Check the **📋 Detailed Logs** tab to view your raw log history.
+   Under the **Report Chart** tab, select a timeframe (week/month) and click **Generate Chart** to update the Matplotlib time distribution. Check the **Detailed Logs** tab to view your raw log history.
 
 ---
 
-## 🛡️ License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
