@@ -10,6 +10,7 @@ import uuid
 from zoneinfo import ZoneInfo
 # pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
+from garmin_integration import sync_garmin_activities
 
 load_dotenv()
 
@@ -53,6 +54,7 @@ def setup_bigquery():
             bigquery.SchemaField("start_time", "TIMESTAMP"),
             bigquery.SchemaField("end_time", "TIMESTAMP"),
             bigquery.SchemaField("duration_second", "INTEGER"),
+            bigquery.SchemaField("detail", "STRING"),
         ]
         table = bigquery.Table(TABLE_ID, schema=schema)
 
@@ -334,7 +336,7 @@ def insert_manual_habit(habit_name, detail, start_str, end_str):
 # HABIT LIST MANAGEMENT
 # ----------------------
 HABITS_FILE = "habits.json"
-DEFAULT_HABITS = ["健身", "閱讀", "烏克麗麗", "吉他", "冥想", "走路", "讀經文"]
+DEFAULT_HABITS = ["閱讀", "吉他", "健身", "烏克麗麗", "冥想", "走路", "讀經文"]
 
 
 def load_habits():
