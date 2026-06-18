@@ -115,26 +115,18 @@ class GarminClient:
         self._api: Optional[Garmin] = None
 
     def connect(self) -> None:
-        tokenstore = Path(self.token_store)
-        if tokenstore.exists():
-            try:
-                self._api = Garmin()
-                logger.info("Attempting token-based login from %s", tokenstore)
-                self._api.login(str(tokenstore))
-                logger.info("Token login successful")
-                return
-            except Exception as exc:
-                logger.warning("Token login failed (%s), falling back to credentials", exc)
-
         if not self.email or not self.password:
             raise ValueError(
-                "GARMIN_EMAIL and GARMIN_PASSWORD must be set when no valid token exists"
+                "GARMIN_EMAIL and GARMIN_PASSWORD must be set"
             )
-        self._api = Garmin(self.email, self.password)
-        self._api.login()
+        
+        tokenstore = Path(self.token_store)
         tokenstore.parent.mkdir(parents=True, exist_ok=True)
-        self._api.garth.dump(str(tokenstore))
-        logger.info("Credential login successful — tokens saved to %s", tokenstore)
+        
+        self._api = Garmin(self.email, self.password)
+        logger.info("Attempting login using token store: %s", tokenstore)
+        self._api.login(str(tokenstore))
+        logger.info("Login successful")
 
     def _call(self, fn, *args, **kwargs) -> Any:
         for attempt in range(self.max_retries):
@@ -210,7 +202,8 @@ class GarminClient:
 GARMIN_TYPE_MAP = {
     "Strength": "健身",
     "Walking": "走路",
-    "Treadmill Running": "健身房跑步機"
+    "Treadmill Running": "跑步機",
+    "Running": "慢跑"
 }
 
 def sync_garmin_activities(bq_client, table_id, days=3):
