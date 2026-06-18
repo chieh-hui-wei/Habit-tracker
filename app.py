@@ -134,6 +134,13 @@ def stop_habit():
 # VIEW DATA
 # ----------------------
 def load_data():
+    # Sync Garmin activities before fetching logs
+    try:
+        sync_status = sync_garmin_activities(client, TABLE_ID)
+        print(f"Garmin Sync: {sync_status}")
+    except Exception as e:
+        print(f"Error syncing Garmin activities: {e}")
+
     # Optimization: Filter by last 7 days + limit to reduce scan volume
     now = datetime.now()
     start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -596,4 +603,16 @@ with gr.Blocks(theme=theme, css=custom_css) as app:
 # ----------------------
 # RUN
 # ----------------------
+import threading
+def initial_sync():
+    try:
+        print("Starting initial Garmin sync in background...")
+        sync_status = sync_garmin_activities(client, TABLE_ID)
+        print(f"Initial Garmin Sync Status: {sync_status}")
+    except Exception as e:
+        print(f"Error during initial Garmin sync: {e}")
+
+threading.Thread(target=initial_sync, daemon=True).start()
+
 app.launch(server_name="0.0.0.0")
+
