@@ -94,5 +94,21 @@
         "type": "monthlyAchievement",
         "investment_id": null,
         "date_unlocked": "2026-06-29T15:45:17.413272"
+    },
+    {
+        "id": "9d950560-d162-49c5-92cc-bcca64c8e2ea",
+        "title": "2026-05 資產月報",
+        "description": "在 2026-05 中，你累計向自我專注投資了 13.2 小時，穩步增值你的時間資產。",
+        "type": "monthlyAchievement",
+        "investment_id": null,
+        "date_unlocked": "2026-06-29T16:56:45.356251"
+    },
+    {
+        "id": "85edef97-f84a-4d4f-b6aa-692bb6d6c5cd",
+        "title": "2026-04 資產月報",
+        "description": "在 2026-04 中，你累計向自我專注投資了 3.3 小時，穩步增值你的時間資產。",
+        "type": "monthlyAchievement",
+        "investment_id": null,
+        "date_unlocked": "2026-06-29T16:56:45.357511"
     }
 ]

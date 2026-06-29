@@ -71,8 +71,11 @@ service.check_and_generate_monthly_summaries()
 # ----------------------
 # HTML BUILDERS
 # ----------------------
-def get_banner_html():
-    stats = service.get_portfolio_summary()
+def get_banner_html(year_str="全部", month_str="全部"):
+    year = int(year_str) if year_str != "全部" else None
+    month = int(month_str) if month_str != "全部" else None
+    
+    stats = service.get_portfolio_summary(year=year, month=month)
     total = stats["total_hours"]
     today = stats["today_hours"]
     streak = stats["streak_days"]
@@ -81,6 +84,13 @@ def get_banner_html():
     m = int((total - h) * 60)
     
     total_formatted = f"<span class='monospace-num' style='font-size: 46px; color: #B48A2C;'>{h}</span><span style='font-size: 20px; color: #475569; margin-left: 2px; margin-right: 6px;'>h</span><span class='monospace-num' style='font-size: 46px; color: #B48A2C;'>{m:02d}</span><span style='font-size: 20px; color: #475569; margin-left: 2px;'>m</span>"
+    
+    if year or month:
+        left_box_label = "投入天數"
+        left_box_val = f"{stats['active_days']} 天"
+    else:
+        left_box_label = "連續天數"
+        left_box_val = f"{streak} 天"
     
     return f"""
         <div style='text-align: center; padding: 1.5rem 0;'>
@@ -91,8 +101,8 @@ def get_banner_html():
             
             <div style='display: flex; justify-content: center; gap: 16px; margin-top: 20px;'>
                 <div style='background: #F1F5F9; padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(200, 157, 69, 0.3); text-align: center; min-width: 90px;'>
-                    <div style='color: #B48A2C; font-size: 16px; font-weight: 700; font-family: monospace;'>{streak}</div>
-                    <div style='color: #475569; font-size: 10px;'>連續天數</div>
+                    <div style='color: #B48A2C; font-size: 16px; font-weight: 700; font-family: monospace;'>{left_box_val}</div>
+                    <div style='color: #475569; font-size: 10px;'>{left_box_label}</div>
                 </div>
                 <div style='background: #F1F5F9; padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(200, 157, 69, 0.3); text-align: center; min-width: 90px;'>
                     <div style='color: #B48A2C; font-size: 16px; font-weight: 700; font-family: monospace;'>{today:.1f}h</div>
@@ -102,35 +112,38 @@ def get_banner_html():
         </div>
     """
 
-def get_allocation_html():
-    allocations = service.get_allocation()
+def get_allocation_html(year_str="全部", month_str="全部"):
+    year = int(year_str) if year_str != "全部" else None
+    month = int(month_str) if month_str != "全部" else None
+    
+    allocations = service.get_allocation(year=year, month=month)
     if not allocations:
-        return "<div style='color: #475569; font-size: 13px; text-align: center; padding: 10px;'>尚無投入數據以進行配置分析</div>"
+        return "<div style='color: #475569; font-size: 13px; text-align: center; padding: 20px;'>尚無投入數據以進行配置分析</div>"
     
-    # Render segmented bar
-    bar_html = "<div style='display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 10px; gap: 2px;'>"
-    for item in allocations:
-        w_pct = item["percentage"] * 100
-        bar_html += f"<div style='width: {w_pct}%; background-color: {item['color']}; height: 100%;'></div>"
-    bar_html += "</div>"
+    allocations = sorted(allocations, key=lambda x: x["percentage"], reverse=True)
     
-    # Render legend
-    legend_html = "<div style='display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; justify-content: center;'>"
+    bar_rows_html = ""
     for item in allocations:
-        legend_html += f"""
-            <div style='display: flex; align-items: center; gap: 5px; font-size: 12px;'>
-                <span style='width: 8px; height: 8px; border-radius: 50%; background-color: {item['color']}; display: inline-block;'></span>
-                <span style='color: #0F172A; font-weight: 500;'>{item['name']}</span>
-                <span style='color: #B48A2C; font-family: monospace; font-weight: 700;'>{item['percentage']*100:.0f}%</span>
+        pct_val = item["percentage"] * 100
+        bar_rows_html += f"""
+            <div style='margin-bottom: 8px;'>
+                <div style='display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;'>
+                    <div style='display: flex; align-items: center; gap: 6px;'>
+                        <span style='width: 8px; height: 8px; border-radius: 50%; background-color: {item['color']}; display: inline-block;'></span>
+                        <span style='color: #0F172A; font-weight: 500;'>{item['name']}</span>
+                    </div>
+                    <span style='color: #B48A2C; font-family: monospace; font-weight: 700;'>{item['hours']:.1f}h ({pct_val:.0f}%)</span>
+                </div>
+                <div style='width: 100%; height: 8px; background-color: #E2E8F0; border-radius: 4px; overflow: hidden;'>
+                    <div style='width: {pct_val}%; height: 100%; background-color: {item['color']}; border-radius: 4px;'></div>
+                </div>
             </div>
         """
-    legend_html += "</div>"
-    
+        
     return f"""
-        <div style='display: flex; flex-direction: column;'>
-            <div style='color: #475569; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;'>時間資產配置比例</div>
-            {bar_html}
-            {legend_html}
+        <div style='display: flex; flex-direction: column; max-height: 180px; overflow-y: auto; padding-right: 4px;'>
+            <div style='color: #475569; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px;'>時間資產配置比例</div>
+            {bar_rows_html}
         </div>
     """
 
@@ -573,11 +586,13 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
 
     # Top Stats Dashboard Row
     with gr.Row(elem_classes="custom-card", equal_height=True):
-        with gr.Column(scale=5):
+        with gr.Column(scale=4):
             banner_view = gr.HTML(value=get_banner_html())
-        with gr.Column(scale=5):
+        with gr.Column(scale=6):
             allocation_view = gr.HTML(value=get_allocation_html())
-        with gr.Column(scale=2, min_width=100):
+        with gr.Column(scale=2, min_width=150):
+            year_dropdown = gr.Dropdown(choices=["全部", "2026", "2025", "2024"], value="全部", label="選擇年份", interactive=True)
+            month_dropdown = gr.Dropdown(choices=["全部", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], value="全部", label="選擇月份", interactive=True)
             refresh_banner_btn = gr.Button("刷新看板", variant="secondary")
 
     with gr.Tabs():
@@ -734,15 +749,15 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
     )
 
     # Confirm settle
-    def complete_settle_workflow(progress_val, total_val, remarks_val):
+    def complete_settle_workflow(progress_val, total_val, remarks_val, year_val, month_val):
         msg = settle_timer(progress_val, total_val, remarks_val)
-        banner = get_banner_html()
-        alloc = get_allocation_html()
+        banner = get_banner_html(year_val, month_val)
+        alloc = get_allocation_html(year_val, month_val)
         return msg, banner, alloc, gr.update(active=False), gr.update(visible=False), gr.update(visible=False), get_stopwatch_html("00:00"), "準備投資"
 
     settle_btn.click(
         fn=complete_settle_workflow,
-        inputs=[settle_progress, settle_total, remarks],
+        inputs=[settle_progress, settle_total, remarks, year_dropdown, month_dropdown],
         outputs=[timer_msg, banner_view, allocation_view, stopwatch_trigger, settle_progress, settle_total, stopwatch_display, timer_msg]
     )
 
@@ -755,8 +770,24 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
     )
 
     # Refresh dashboard
+    def update_dashboard(year, month):
+        banner = get_banner_html(year, month)
+        alloc = get_allocation_html(year, month)
+        return banner, alloc
+
+    year_dropdown.change(
+        fn=update_dashboard,
+        inputs=[year_dropdown, month_dropdown],
+        outputs=[banner_view, allocation_view]
+    )
+    month_dropdown.change(
+        fn=update_dashboard,
+        inputs=[year_dropdown, month_dropdown],
+        outputs=[banner_view, allocation_view]
+    )
     refresh_banner_btn.click(
-        fn=lambda: (get_banner_html(), get_allocation_html()),
+        fn=update_dashboard,
+        inputs=[year_dropdown, month_dropdown],
         outputs=[banner_view, allocation_view]
     )
 

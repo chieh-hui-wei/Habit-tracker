@@ -199,11 +199,18 @@ class TimeVestService:
         return newly_unlocked
 
     # --- Stats & Query Summaries ---
-    def get_portfolio_summary(self):
+    def get_portfolio_summary(self, year=None, month=None):
         # We query BigQuery for overall stats to avoid drift
+        where_clause = "WHERE 1=1"
+        if year:
+            where_clause += f" AND EXTRACT(YEAR FROM start_time) = {year}"
+        if month:
+            where_clause += f" AND EXTRACT(MONTH FROM start_time) = {month}"
+
         query = f"""
             SELECT SUM(duration_second) as total_sec, COUNT(DISTINCT DATE(start_time)) as active_days
             FROM `{self.table_id}`
+            {where_clause}
         """
         try:
             df = self.bq_client.query(query).to_dataframe()
@@ -236,7 +243,8 @@ class TimeVestService:
         return {
             "total_hours": total_hours,
             "today_hours": today_hours,
-            "streak_days": streak
+            "streak_days": streak,
+            "active_days": active_days
         }
 
     def calculate_streak(self):
@@ -269,10 +277,17 @@ class TimeVestService:
             print(f"Streak calculation failed: {e}")
             return 0
 
-    def get_allocation(self):
+    def get_allocation(self, year=None, month=None):
+        where_clause = "WHERE 1=1"
+        if year:
+            where_clause += f" AND EXTRACT(YEAR FROM start_time) = {year}"
+        if month:
+            where_clause += f" AND EXTRACT(MONTH FROM start_time) = {month}"
+
         query = f"""
             SELECT habit_name, SUM(duration_second) as total_sec
             FROM `{self.table_id}`
+            {where_clause}
             GROUP BY habit_name
         """
         allocations = []
