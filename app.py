@@ -21,10 +21,10 @@ load_dotenv()
 # ----------------------
 # BIGQUERY SETUP
 # ----------------------
-PROJECT_ID = os.environ.get("BQ_PROJECT_ID")
-DATASET_ID = os.environ.get("BQ_DATASET_ID")
+PROJECT_ID = os.environ.get("BQ_PROJECT_ID", "").strip('"').strip("'")
+DATASET_ID = os.environ.get("BQ_DATASET_ID", "").strip('"').strip("'")
 TABLE_ID = f"{PROJECT_ID}.{DATASET_ID}.habit_logs"
-credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '').strip('"').strip("'")
 
 credentials = service_account.Credentials.from_service_account_file(credentials_path)
 client = bigquery.Client(project=PROJECT_ID, credentials=credentials)
