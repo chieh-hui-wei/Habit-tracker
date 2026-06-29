@@ -71,6 +71,16 @@ service.check_and_generate_monthly_summaries()
 # ----------------------
 # HTML BUILDERS
 # ----------------------
+def get_icon_svg(icon_name, color="#475569"):
+    svgs = {
+        "book.fill": f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>',
+        "guitars.fill": f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+        "dumbbell.fill": f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></svg>',
+        "figure.run": f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;"><path d="M18 6h.01M6 18h.01M12 12h.01M21 21l-4.3-4.3M4.3 4.3L21 21M3 3l18 18"/></svg>',
+        "laptopcomputer": f'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle;"><rect width="18" height="12" x="3" y="4" rx="2" ry="2"/><line x1="2" x2="22" y1="20" y2="20"/><line x1="5" x2="19" y1="16" y2="16"/></svg>',
+    }
+    return svgs.get(icon_name, "")
+
 def get_banner_html(year_str="全部", month_str="全部"):
     year = int(year_str) if year_str != "全部" else None
     month = int(month_str) if month_str != "全部" else None
@@ -125,11 +135,13 @@ def get_allocation_html(year_str="全部", month_str="全部"):
     bar_rows_html = ""
     for item in allocations:
         pct_val = item["percentage"] * 100
+        inv = next((i for i in service.investments if i["name"] == item['name']), None)
+        icon_svg = get_icon_svg(inv["icon"], item['color']) if inv else ""
         bar_rows_html += f"""
             <div style='margin-bottom: 8px;'>
                 <div style='display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;'>
                     <div style='display: flex; align-items: center; gap: 6px;'>
-                        <span style='width: 8px; height: 8px; border-radius: 50%; background-color: {item['color']}; display: inline-block;'></span>
+                        {icon_svg}
                         <span style='color: #0F172A; font-weight: 500;'>{item['name']}</span>
                     </div>
                     <span style='color: #B48A2C; font-family: monospace; font-weight: 700;'>{item['hours']:.1f}h ({pct_val:.0f}%)</span>
@@ -161,10 +173,12 @@ def get_statement_html():
     
     detail_rows = ""
     for item in distribution:
+        inv = next((i for i in service.investments if i["name"] == item['name']), None)
+        icon_svg = get_icon_svg(inv["icon"], item['color']) if inv else ""
         detail_rows += f"""
             <div style='display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;'>
                 <div style='display: flex; align-items: center; gap: 5px;'>
-                    <span style='width: 6px; height: 6px; border-radius: 50%; background-color: {item['color']}; display: inline-block;'></span>
+                    {icon_svg}
                     <span style='color: #0F172A;'>{item['name']}</span>
                 </div>
                 <span style='color: #475569; font-family: monospace;'>{item['hours']:.1f}h ({item['percentage']*100:.0f}%)</span>
@@ -427,19 +441,33 @@ def discard_timer():
     timer_state["is_paused"] = False
     return "已放棄本次投入"
 
+def get_investment_choices():
+    icon_map = {
+        "book.fill": "📖",
+        "guitars.fill": "🎸",
+        "dumbbell.fill": "🏋️",
+        "figure.run": "🏃",
+        "laptopcomputer": "💻"
+    }
+    choices = []
+    for i in service.investments:
+        emoji = icon_map.get(i["icon"], "💼")
+        choices.append((f"{emoji} {i['name']}", i["name"]))
+    return choices
+
 # Settings / Actions
 def add_new_investment_option(name, icon, color, progress_type, item_label):
     if not name.strip():
-        return gr.update(choices=[i["name"] for i in service.investments]), "帳戶名稱不能為空"
+        return gr.update(choices=get_investment_choices()), "帳戶名稱不能為空"
     service.add_investment(name.strip(), icon, color, item_label.strip(), progress_type)
-    return gr.update(choices=[i["name"] for i in service.investments]), f"已成功開立新投資帳戶：{name}"
+    return gr.update(choices=get_investment_choices()), f"已成功開立新投資帳戶：{name}"
 
 def delete_investment_option(name):
     inv = next((i for i in service.investments if i["name"] == name), None)
     if not inv:
-        return gr.update(choices=[i["name"] for i in service.investments]), "找不到要刪除的帳戶"
+        return gr.update(choices=get_investment_choices()), "找不到要刪除的帳戶"
     service.delete_investment(inv["id"])
-    return gr.update(choices=[i["name"] for i in service.investments]), f"已刪除帳戶及其所有項目：{name}"
+    return gr.update(choices=get_investment_choices()), f"已刪除帳戶及其所有項目：{name}"
 
 def add_new_item_option(inv_name, name, total_val):
     inv = next((i for i in service.investments if i["name"] == inv_name), None)
@@ -600,7 +628,6 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         with gr.Column(scale=2, min_width=150):
             year_dropdown = gr.Dropdown(choices=["全部", "2026", "2025", "2024"], value="全部", label="選擇年份", interactive=True)
             month_dropdown = gr.Dropdown(choices=["全部", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], value="全部", label="選擇月份", interactive=True)
-            refresh_banner_btn = gr.Button("刷新看板", variant="secondary")
 
     with gr.Tabs():
         # Tab 1: Circular Stopwatch Tracking Card (timer section)
@@ -611,7 +638,7 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
                 # Active investment setup
                 with gr.Row():
                     invest_dropdown = gr.Dropdown(
-                        choices=[i["name"] for i in service.investments],
+                        choices=get_investment_choices(),
                         label="選擇投資帳戶",
                         value=service.investments[0]["name"] if service.investments else None,
                         interactive=True
@@ -647,8 +674,27 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         with gr.TabItem("手動記錄"):
             with gr.Group(elem_classes="custom-card"):
                 gr.Markdown("### 手動記錄投入")
-                manual_start = gr.Textbox(label="開始時間 (YYYY-MM-DD HH:MM)")
-                manual_end = gr.Textbox(label="結束時間 (YYYY-MM-DD HH:MM)")
+                manual_invest_dropdown = gr.Dropdown(
+                    choices=get_investment_choices(),
+                    label="選擇投資帳戶",
+                    value=service.investments[0]["name"] if service.investments else None
+                )
+                
+                # Check initial items for default selection
+                init_choices = []
+                init_visible = False
+                init_label = "項目"
+                if service.investments:
+                    default_inv = service.investments[0]
+                    if default_inv["item_label"]:
+                        init_choices = [it["name"] for it in service.get_items(inv_id=default_inv["id"], status="inProgress")]
+                        init_visible = True
+                        init_label = default_inv["item_label"]
+                        
+                manual_item_dropdown = gr.Dropdown(choices=init_choices, visible=init_visible, label=init_label)
+                
+                manual_start = gr.Textbox(label="開始時間 (YYYY-MM-DD HH:MM)", placeholder="例如: 2026-06-29 14:00")
+                manual_end = gr.Textbox(label="結束時間 (YYYY-MM-DD HH:MM)", placeholder="例如: 2026-06-29 15:30")
                 manual_remarks = gr.Textbox(label="投入備忘")
                 manual_submit = gr.Button("手動入帳", variant="secondary")
 
@@ -658,7 +704,7 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
                 gr.Markdown("### 項目追蹤看板")
                 with gr.Row():
                     items_inv_dropdown = gr.Dropdown(
-                        choices=[i["name"] for i in service.investments],
+                        choices=get_investment_choices(),
                         label="選擇投資帳戶",
                         value=service.investments[0]["name"] if service.investments else None
                     )
@@ -708,7 +754,17 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
             with gr.Group(elem_classes="custom-card"):
                 gr.Markdown("### 投資帳戶增刪")
                 new_inv_name = gr.Textbox(label="帳戶名稱", placeholder="例如: 日常閱讀")
-                new_inv_icon = gr.Dropdown(choices=["book.fill", "guitars.fill", "dumbbell.fill", "figure.run", "laptopcomputer"], value="book.fill", label="圖示")
+                new_inv_icon = gr.Dropdown(
+                    choices=[
+                        ("📖 書本 (book.fill)", "book.fill"),
+                        ("🎸 吉他 (guitars.fill)", "guitars.fill"),
+                        ("🏋️ 啞鈴 (dumbbell.fill)", "dumbbell.fill"),
+                        ("🏃 跑步 (figure.run)", "figure.run"),
+                        ("💻 電腦 (laptopcomputer)", "laptopcomputer")
+                    ],
+                    value="book.fill",
+                    label="圖示"
+                )
                 new_inv_color = gr.ColorPicker(value="#E2B659", label="代表顏色")
                 new_inv_prog = gr.Radio(choices=["pages", "percentage", "none"], value="none", label="進度模式")
                 new_inv_label = gr.Textbox(label="項目標籤 (如: 書籍, 曲目, 課程) 空白則為時間累積型")
@@ -716,7 +772,7 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
                 add_inv_btn = gr.Button("開立新投資帳戶", variant="primary")
                 
                 delete_inv_dropdown = gr.Dropdown(
-                    choices=[i["name"] for i in service.investments],
+                    choices=get_investment_choices(),
                     label="選擇要銷戶的帳戶"
                 )
                 delete_inv_btn = gr.Button("銷戶並清空項目", variant="stop")
@@ -728,6 +784,12 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         fn=dynamic_update_items_dropdown,
         inputs=[invest_dropdown],
         outputs=[item_dropdown]
+    )
+
+    manual_invest_dropdown.change(
+        fn=dynamic_update_items_dropdown,
+        inputs=[manual_invest_dropdown],
+        outputs=[manual_item_dropdown]
     )
 
     # Timer actions
@@ -792,11 +854,6 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         inputs=[year_dropdown, month_dropdown],
         outputs=[banner_view, allocation_view]
     )
-    refresh_banner_btn.click(
-        fn=update_dashboard,
-        inputs=[year_dropdown, month_dropdown],
-        outputs=[banner_view, allocation_view]
-    )
 
     # Manual entry
     def run_manual_entry(inv_name, item_name, start_s, end_s, rems):
@@ -831,7 +888,7 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
 
     manual_submit.click(
         fn=run_manual_entry,
-        inputs=[invest_dropdown, item_dropdown, manual_start, manual_end, manual_remarks],
+        inputs=[manual_invest_dropdown, manual_item_dropdown, manual_start, manual_end, manual_remarks],
         outputs=[timer_msg]
     )
 
@@ -893,8 +950,12 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         inputs=[new_inv_name, new_inv_icon, new_inv_color, new_inv_prog, new_inv_label],
         outputs=[invest_dropdown, settings_status]
     ).then(
-        fn=lambda: (gr.update(choices=[i["name"] for i in service.investments]), gr.update(choices=[i["name"] for i in service.investments])),
-        outputs=[delete_inv_dropdown, items_inv_dropdown]
+        fn=lambda: (
+            gr.update(choices=get_investment_choices()),
+            gr.update(choices=get_investment_choices()),
+            gr.update(choices=get_investment_choices())
+        ),
+        outputs=[delete_inv_dropdown, items_inv_dropdown, manual_invest_dropdown]
     )
 
     delete_inv_btn.click(
@@ -902,8 +963,12 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         inputs=[delete_inv_dropdown],
         outputs=[invest_dropdown, settings_status]
     ).then(
-        fn=lambda: (gr.update(choices=[i["name"] for i in service.investments]), gr.update(choices=[i["name"] for i in service.investments])),
-        outputs=[delete_inv_dropdown, items_inv_dropdown]
+        fn=lambda: (
+            gr.update(choices=get_investment_choices()),
+            gr.update(choices=get_investment_choices()),
+            gr.update(choices=get_investment_choices())
+        ),
+        outputs=[delete_inv_dropdown, items_inv_dropdown, manual_invest_dropdown]
     )
 
 # Background initial Garmin Sync

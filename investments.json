@@ -7,5 +7,14 @@
         "item_label": "書籍",
         "progress_type": "pages",
         "total_duration": 0
+    },
+    {
+        "id": "b8e23ed9-be48-43bd-b791-a9ba3c530539",
+        "name": "Gym",
+        "icon": "dumbbell.fill",
+        "color": "#E2B659",
+        "item_label": null,
+        "progress_type": "none",
+        "total_duration": 0
     }
 ]
