@@ -7,4 +7,4 @@ matplotlib==3.7.5
 db-dtypes==1.5.1
 python-dotenv==1.0.1
 google-cloud-bigquery-storage==2.37.0
-garminconnect>=0.3.6
+garminconnect>=0.3.1
