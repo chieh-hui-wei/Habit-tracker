@@ -1,78 +1,81 @@
-# 🧠 Habit Tracker
+# 時光投資簿 timeVest 📈
 
-A personal habit tracker built with **Gradio** and **Google BigQuery**. It features a modern two-column SaaS analytics layout, dynamic habit choices management with local persistence, automatic session timing, manual time logging, and beautiful Matplotlib analytics charts.
-
----
-
-## Features
-### Flexible Choice Management
-* **Dynamic Editing**: Easily add or delete habits directly from the web browser under the **Habit List Settings** tab.
-* **Persistent Storage**: Dynamic changes are persisted locally in `habits.json` and synchronized across all dropdowns instantly.
-
-### BigQuery Performance Architecture
-* **Daily Partitioning**: Optimized BigQuery schema partitioned on `start_time` to dramatically reduce query costs over large historical sets.
-* **Clustering by Habit**: Clustered on `habit_name` to make group-by aggregations and habit-specific searches ultra-fast.
-* **Buffered Insertion**: Handled via rapid JSON streaming insertions.
+時光投資簿 (timeVest) 是一個專為個人成長設計的時間資產管理與習慣投資系統，基於 **Gradio** 與 **Google BigQuery** 建置。系統採用精緻的高對比淺色調（Light Mode）單欄式佈局，將核心資產看版置頂，並將所有功能整合至 6 個專業分工的頁籤中，完美消除垂直滾動，提升使用體驗。
 
 ---
 
-## Getting Started
+## 核心特徵
 
-### Prerequisites
+### 1. 頂部資產看板 (置頂顯示)
+* **專注資產總額**：即時統計您在各項目中累積注入的專注總時數。
+* **連續天數與今日收益**：紀錄您的持續自律天數與當日專注收益。
+* **時間資產配置比例**：視覺化呈現您的時間資產在不同領域的分佈比例，隨時掌控配置。
 
+### 2. 6 大功能頁籤
+* **專注計時**：提供純文字無表情符號、高質感的等寬字型 HTML 計時器。支援選擇投資帳戶與項目，進行專注注入，並可於結算時輸入頁數或百分比進度。
+* **手動記錄**：用於補登過去的專注時間，確保資產無漏登。
+* **項目管理**：追蹤特定項目的進度（如閱讀書籍頁數、課程進度百分比），並支援動態新增與狀態管理。
+* **投資收益**：查看解鎖的里程碑與生成的月度資產報告。
+* **時光對帳單**：一鍵產生如年度回顧般的「個人自我投資對帳單」，結算累積總時數、增值最多項目與資產分佈明細。
+* **帳戶管理**：自由開立新投資帳戶（支援設定圖示、代表顏色與進度模式），或針對舊帳戶進行銷戶。
+
+### 3. Garmin 智慧穿戴同步
+* 自動於背景同步 Garmin 運動設備紀錄（如慢跑、走路、健身），自動轉換為您的健康時間資產，無需手動補登。
+
+### 4. 高效 BigQuery 架構
+* **分區與叢集**：資料表以 `start_time` 進行每日分區，並以 `habit_name` 進行叢集優化，大幅節省查詢費用並提升載入速度。
+* **本地資料持久化**：帳戶配置、子項目及里程碑紀錄同步保存於本地 JSON 檔案中，並在部署時透過 Docker 卷冊進行持久化儲存。
+
+---
+
+## 快速開始
+
+### 環境需求
 * **Python 3.10+**
-* **Google Cloud Platform (GCP) Project** with BigQuery enabled and a service account key JSON file.
-* **System Fonts**: To display Matplotlib charts correctly with Chinese text:
-  * Ubuntu/Debian: `sudo apt install fonts-wqy-zenhei fonts-wqy-microhei`
+* **Google Cloud Platform (GCP) 專案**：需啟用 BigQuery，並下載服務帳戶的憑證金鑰 JSON 檔案。
+* **Garmin Connect 帳號**（選用，用於同步運動狀態）。
 
 ---
 
-### Installation & Setup
+### 安裝與設定
 
-1. **Clone the repository**:
+1. **複製專案庫**：
    ```bash
    git clone https://github.com/chieh-hui-wei/Habit-tracker.git
    cd Habit-tracker
    ```
 
-2. **Install Dependencies**:
-   You can run the provided installer or install them manually:
+2. **安裝 Python 依賴套件**：
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure Environment Variables**:
-   Set up your GCP BigQuery configurations (e.g. in your `.env` or shell profile):
+3. **設定環境變數**：
+   將 `.env.example` 複製為 `.env`：
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` with your GCP credentials.
+   編輯 `.env` 並填入您的 GCP BigQuery 專案資訊及 Garmin 帳密：
+   ```env
+   BQ_PROJECT_ID=您的GCP專案ID
+   BQ_DATASET_ID=您的BigQuery資料集ID
+   GOOGLE_APPLICATION_CREDENTIALS=您的gcp金鑰路徑(例如 ./gcp-key.json)
+   GARMIN_EMAIL=您的Garmin帳號
+   GARMIN_PASSWORD=您的Garmin密碼
+   ```
 
 ---
 
-## Usage
+## 本地執行
 
-### Running the App
-
-Start the server using Python:
+啟動 Gradio 應用程式伺服器：
 ```bash
 python3 app.py
 ```
-Open the local URL printed in your terminal (usually `http://127.0.0.1:7860`).
-
-### Dashboard Guide
-
-1. **Start Tracking automatically**:
-   Select a habit from the dropdown (e.g., `健身`), add any details (e.g., `Leg Day`), and click **Start Session**. When you are finished, click **Stop & Save** to automatically compute the duration and log it to BigQuery.
-2. **Submit Manual Entries**:
-   Input a start time and end time matching `YYYY-MM-DD HH:MM` and click **Submit Manual Entry**.
-3. **Customize your Habits list**:
-   Navigate to the **Habit List Settings** tab. Use the left column to add new habits (e.g., `寫程式`), or the right dropdown to remove choices you no longer need.
-4. **View Logs & Charts**:
-   Under the **Report Chart** tab, select a timeframe (week/month) and click **Generate Chart** to update the Matplotlib time distribution. Check the **Detailed Logs** tab to view your raw log history.
+啟動後，在瀏覽器中打開終端機輸出的網址（預設為 `http://127.0.0.1:7860`）即可開始使用。
 
 ---
 
-## License
+## 授權條款
 
-This project is licensed under the [MIT License](LICENSE).
+本專案採用 [MIT 授權條款](LICENSE) 進行授權。
