@@ -1,0 +1,11 @@
+[
+    {
+        "id": "e2b65900-1111-2222-3333-444455556666",
+        "name": "日常閱讀",
+        "icon": "book.fill",
+        "color": "#E2B659",
+        "item_label": "書籍",
+        "progress_type": "pages",
+        "total_duration": 0
+    }
+]

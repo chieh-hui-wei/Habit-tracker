@@ -64,8 +64,11 @@ jobs:
             # Pull latest docker image
             sudo docker pull ghcr.io/$IMAGE_NAME:latest
 
-            # Ensure habits.json exists as a file so Docker doesn't mount it as a directory
+            # Ensure habits.json and database files exist as files so Docker doesn't mount them as directories
             touch /home/a0976395798/Habit-tracker/habits.json
+            touch /home/a0976395798/Habit-tracker/investments.json
+            touch /home/a0976395798/Habit-tracker/items.json
+            touch /home/a0976395798/Habit-tracker/milestones.json
 
             # Stop and remove existing container if it exists
             sudo docker stop habit-tracker || true
@@ -80,5 +83,8 @@ jobs:
               -e GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-key.json \
               -v /home/a0976395798/Habit-tracker/gcp-key.json:/app/gcp-key.json \
               -v /home/a0976395798/Habit-tracker/habits.json:/app/habits.json \
+              -v /home/a0976395798/Habit-tracker/investments.json:/app/investments.json \
+              -v /home/a0976395798/Habit-tracker/items.json:/app/items.json \
+              -v /home/a0976395798/Habit-tracker/milestones.json:/app/milestones.json \
               ghcr.io/$IMAGE_NAME:latest
 
