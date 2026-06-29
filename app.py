@@ -510,12 +510,19 @@ custom_css = """
     color: #0F172A !important;
 }
 
-/* Force light style on inputs, textboxes and dropdowns */
-input, select, textarea, .gr-input, .gr-input-label, .select-wrap, .dropdown, .choices__inner, .choices__list {
+/* Force light style on inputs, textboxes and dropdowns (excluding radios/checkboxes) */
+input:not([type="radio"]):not([type="checkbox"]), select, textarea, .gr-input, .gr-input-label, .select-wrap, .dropdown, .choices__inner, .choices__list {
     background-color: #FFFFFF !important;
     background: #FFFFFF !important;
     color: #0F172A !important;
     border-color: rgba(148, 163, 184, 0.5) !important;
+}
+
+/* Checked radio selector inner dot fix */
+input[type="radio"]:checked {
+    background-color: #C89D45 !important;
+    border-color: #C89D45 !important;
+    background-image: radial-gradient(circle, #FFFFFF 35%, transparent 40%) !important;
 }
 
 /* Fix text and label colors */
