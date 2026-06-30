@@ -360,9 +360,21 @@ def get_items_summary_html(inv_id, status):
     if not items:
         return "<div style='color: #475569; text-align: center; padding: 20px;'>無此狀態項目</div>"
         
+    inv = next((i for i in service.investments if i["id"] == inv_id), None)
+    progress_type = inv["progress_type"] if inv else "none"
+    
     html = "<div style='display: flex; flex-direction: column; gap: 12px;'>"
     for item in items:
         pct = item["progress"] * 100
+        if progress_type == "pages" and item.get("total"):
+            total_val = float(item["total"])
+            current_val = item["progress"] * total_val
+            progress_str = f"{current_val:.0f} / {total_val:.0f} 頁 ({pct:.0f}%)"
+        elif progress_type == "percentage":
+            progress_str = f"{pct:.0f}%"
+        else:
+            progress_str = "時間累積"
+            
         html += f"""
             <div style='background: #F8FAFC; padding: 14px; border-radius: 12px; border: 1px solid rgba(200, 157, 69, 0.15); display: flex; justify-content: space-between; align-items: center;'>
                 <div>
@@ -370,7 +382,7 @@ def get_items_summary_html(inv_id, status):
                     <div style='color: #475569; font-size: 11px; margin-top: 2px;'>狀態：{item['status']}</div>
                 </div>
                 <div style='text-align: right;'>
-                    <span style='color: #B48A2C; font-family: monospace; font-size: 16px; font-weight: 700;'>{pct:.0f}%</span>
+                    <span style='color: #B48A2C; font-family: monospace; font-size: 13px; font-weight: 700;'>{progress_str}</span>
                     <div style='width: 80px; height: 4px; background: rgba(148, 163, 184, 0.3); border-radius: 2px; overflow: hidden; margin-top: 4px;'>
                         <div style='width: {pct}%; height: 100%; background: #B48A2C;'></div>
                     </div>
