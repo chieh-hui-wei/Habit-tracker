@@ -158,9 +158,11 @@ def get_allocation_html(start_date=None, end_date=None):
         </div>
     """
 
-def get_statement_html():
-    stats = service.get_portfolio_summary()
-    allocations = service.get_allocation()
+def get_statement_html(start_date=None, end_date=None):
+    sd = start_date.strip() if start_date and start_date.strip() else None
+    ed = end_date.strip() if end_date and end_date.strip() else None
+    stats = service.get_portfolio_summary(start_date=sd, end_date=ed)
+    allocations = service.get_allocation(start_date=sd, end_date=ed)
     total = stats["total_hours"]
     streak = stats["streak_days"]
 
@@ -742,41 +744,27 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         """
     )
 
-    # Top Stats Dashboard Row (Portfolio Summary)
+    # Top Dashboard Block (Portfolio Summary & Asset Allocation sharing the same range)
     with gr.Row(elem_classes="custom-card", equal_height=True):
-        with gr.Column(scale=8):
+        with gr.Column(scale=4):
             banner_view = gr.HTML(value=get_banner_html())
-        with gr.Column(scale=4, min_width=150):
-            gr.Markdown("#### 專注資產總額篩選")
-            banner_start_date = gr.Textbox(
+        with gr.Column(scale=5):
+            _default_start = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            _default_end = datetime.now().strftime("%Y-%m-%d")
+            allocation_view = gr.HTML(value=get_allocation_html(start_date=_default_start, end_date=_default_end))
+        with gr.Column(scale=3, min_width=150):
+            gr.Markdown("#### 儀表板時間篩選")
+            dashboard_start_date = gr.Textbox(
                 label="開始日期 (YYYY-MM-DD)", 
-                value="", 
-                placeholder="例如: 2026-06-01 (空白為全部)"
-            )
-            banner_end_date = gr.Textbox(
-                label="結束日期 (YYYY-MM-DD)", 
-                value="", 
-                placeholder="例如: 2026-06-30 (空白為全部)"
-            )
-            banner_refresh_btn = gr.Button("更新總額統計", variant="secondary")
-
-    # Bottom Stats Dashboard Row (Asset Allocation Distribution)
-    with gr.Row(elem_classes="custom-card", equal_height=True):
-        with gr.Column(scale=8):
-            allocation_view = gr.HTML(value=get_allocation_html())
-        with gr.Column(scale=4, min_width=150):
-            gr.Markdown("#### 時間資產配置篩選")
-            alloc_start_date = gr.Textbox(
-                label="開始日期 (YYYY-MM-DD)", 
-                value=(datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"), 
+                value=_default_start, 
                 placeholder="例如: 2026-06-01"
             )
-            alloc_end_date = gr.Textbox(
+            dashboard_end_date = gr.Textbox(
                 label="結束日期 (YYYY-MM-DD)", 
-                value=datetime.now().strftime("%Y-%m-%d"), 
+                value=_default_end, 
                 placeholder="例如: 2026-06-30"
             )
-            alloc_refresh_btn = gr.Button("更新配置比例", variant="secondary")
+            dashboard_refresh_btn = gr.Button("更新儀表板", variant="secondary")
 
     with gr.Tabs():
         # Tab 1: Circular Stopwatch Tracking Card (timer section)
@@ -983,6 +971,17 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         with gr.TabItem("時光對帳單"):
             with gr.Group(elem_classes="custom-card"):
                 gr.Markdown("### 自律對帳結算")
+                with gr.Row():
+                    statement_start_date = gr.Textbox(
+                        label="對帳開始日期 (YYYY-MM-DD)", 
+                        value=(datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"), 
+                        placeholder="例如: 2026-01-01"
+                    )
+                    statement_end_date = gr.Textbox(
+                        label="對帳結束日期 (YYYY-MM-DD)", 
+                        value=datetime.now().strftime("%Y-%m-%d"), 
+                        placeholder="例如: 2026-12-31"
+                    )
                 statement_generate_btn = gr.Button("產生時光對帳單", variant="primary")
                 statement_display_html = gr.HTML()
 
@@ -1076,15 +1075,15 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
     )
 
     # Confirm settle
-    def complete_settle_workflow(progress_val, total_val, remarks_val, settle_status_val, banner_start_val, banner_end_val, alloc_start_val, alloc_end_val):
+    def complete_settle_workflow(progress_val, total_val, remarks_val, settle_status_val, db_start_val, db_end_val):
         msg = settle_timer(progress_val, total_val, remarks_val, settle_status_val)
-        banner = get_banner_html(banner_start_val.strip(), banner_end_val.strip())
-        alloc = get_allocation_html(alloc_start_val.strip(), alloc_end_val.strip())
+        banner = get_banner_html(db_start_val.strip(), db_end_val.strip())
+        alloc = get_allocation_html(db_start_val.strip(), db_end_val.strip())
         return msg, banner, alloc, gr.update(active=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), get_stopwatch_html("00:00"), "準備投資"
 
     settle_btn.click(
         fn=complete_settle_workflow,
-        inputs=[settle_progress, settle_total, remarks, settle_status, banner_start_date, banner_end_date, alloc_start_date, alloc_end_date],
+        inputs=[settle_progress, settle_total, remarks, settle_status, dashboard_start_date, dashboard_end_date],
         outputs=[timer_msg, banner_view, allocation_view, stopwatch_trigger, settle_progress, settle_total, settle_status, stopwatch_display, timer_msg]
     )
 
@@ -1096,24 +1095,16 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         outputs=[stopwatch_trigger, stopwatch_display, timer_msg, settle_progress, settle_total, settle_status]
     )
 
-    # Refresh banner total
-    def update_banner(start_d, end_d):
-        return get_banner_html(start_d.strip(), end_d.strip())
+    # Refresh dashboard
+    def update_dashboard(start_d, end_d):
+        banner = get_banner_html(start_d.strip(), end_d.strip())
+        alloc = get_allocation_html(start_d.strip(), end_d.strip())
+        return banner, alloc
 
-    banner_refresh_btn.click(
-        fn=update_banner,
-        inputs=[banner_start_date, banner_end_date],
-        outputs=[banner_view]
-    )
-
-    # Refresh allocation chart
-    def update_allocation(start_d, end_d):
-        return get_allocation_html(start_d.strip(), end_d.strip())
-
-    alloc_refresh_btn.click(
-        fn=update_allocation,
-        inputs=[alloc_start_date, alloc_end_date],
-        outputs=[allocation_view]
+    dashboard_refresh_btn.click(
+        fn=update_dashboard,
+        inputs=[dashboard_start_date, dashboard_end_date],
+        outputs=[banner_view, allocation_view]
     )
 
     # Manual entry
@@ -1203,6 +1194,7 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
     # Tab 3 actions: Wrapped Statement
     statement_generate_btn.click(
         fn=get_statement_html,
+        inputs=[statement_start_date, statement_end_date],
         outputs=[statement_display_html]
     )
 
