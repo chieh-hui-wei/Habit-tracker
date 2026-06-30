@@ -502,3 +502,16 @@ class TimeVestService:
         except Exception as e:
             print(f"Error updating BQ row: {e}")
             return False, f"更新失敗：{e}"
+
+    def delete_historical_activity(self, row_id, start_date):
+        query = f"""
+            DELETE FROM `{self.table_id}`
+            WHERE id = '{row_id}' AND DATE(start_time) = '{start_date}'
+        """
+        try:
+            query_job = self.bq_client.query(query)
+            query_job.result()
+            return True, "該筆歷史專注紀錄已成功刪除！"
+        except Exception as e:
+            print(f"Error deleting BQ row: {e}")
+            return False, f"刪除失敗：{e}"

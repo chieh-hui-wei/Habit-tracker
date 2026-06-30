@@ -908,7 +908,9 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
                         hist_edit_progress = gr.Textbox(label="進度值 (百分比或頁數)", placeholder="例如: 180 或 45")
                         hist_edit_total = gr.Textbox(label="總頁數 (若無則不填)", placeholder="例如: 300")
                     hist_edit_detail = gr.Textbox(label="投入備忘/細節說明", placeholder="更新該筆投入的備忘細節...")
-                    hist_update_btn = gr.Button("更新此筆歷史紀錄", variant="primary")
+                    with gr.Row():
+                        hist_update_btn = gr.Button("更新此筆歷史紀錄", variant="primary")
+                        hist_delete_btn = gr.Button("刪除此筆歷史紀錄", variant="stop")
                     hist_update_status = gr.Markdown()
 
             # Delete item panel
@@ -1276,6 +1278,25 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         fn=hist_update_record,
         inputs=[hist_log_selector, hist_edit_item_name, hist_edit_progress, hist_edit_total, hist_edit_detail, hist_inv_dropdown],
         outputs=[hist_update_status]
+    )
+
+    def hist_delete_record(selector_val):
+        if not selector_val:
+            return "請先選擇要刪除的紀錄"
+        data = json.loads(selector_val)
+        row_id = data["id"]
+        start_date = data["start_time"]
+        success, msg = service.delete_historical_activity(row_id, start_date)
+        return msg
+
+    hist_delete_btn.click(
+        fn=hist_delete_record,
+        inputs=[hist_log_selector],
+        outputs=[hist_update_status]
+    ).then(
+        fn=hist_fetch_records,
+        inputs=[hist_start_date, hist_end_date, hist_inv_dropdown],
+        outputs=[hist_log_selector, hist_edit_inputs_group]
     )
 
     # Delete Item handlers
