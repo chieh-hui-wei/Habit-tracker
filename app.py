@@ -164,72 +164,156 @@ def get_statement_html():
     allocations = service.get_allocation()
     total = stats["total_hours"]
     streak = stats["streak_days"]
-    
+
     h = int(total)
     m = int((total - h) * 60)
-    
+
     distribution = sorted(allocations, key=lambda x: x["hours"], reverse=True)
     top_inv = distribution[0]["name"] if distribution else "無"
-    
+
     detail_rows = ""
     for item in distribution:
-        inv = next((i for i in service.investments if i["name"] == item['name']), None)
-        icon_svg = get_icon_svg(inv["icon"], item['color']) if inv else ""
-        detail_rows += f"""
-            <div style='display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;'>
-                <div style='display: flex; align-items: center; gap: 5px;'>
-                    {icon_svg}
-                    <span style='color: #0F172A;'>{item['name']}</span>
-                </div>
-                <span style='color: #475569; font-family: monospace;'>{item['hours']:.1f}h ({item['percentage']*100:.0f}%)</span>
-            </div>
-        """
-        
+        inv = next((i for i in service.investments if i["name"] == item["name"]), None)
+        icon_svg = get_icon_svg(inv["icon"], item["color"]) if inv else ""
+        detail_rows += (
+            "<div style='display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;'>"
+            "<div style='display: flex; align-items: center; gap: 5px;'>"
+            f"{icon_svg}"
+            f"<span style='color: #0F172A;'>{item['name']}</span>"
+            "</div>"
+            f"<span style='color: #475569; font-family: monospace;'>{item['hours']:.1f}h ({item['percentage']*100:.0f}%)</span>"
+            "</div>"
+        )
+
+    # Build quantified results section
+    quant_sections = ""
+    for inv in service.investments:
+        if not inv.get("item_label"):
+            continue
+        label = inv["item_label"]
+        icon_svg = get_icon_svg(inv["icon"], inv["color"])
+        completed_items = service.get_items(inv_id=inv["id"], status="completed")
+        inprogress_items = service.get_items(inv_id=inv["id"], status="inProgress")
+
+        if not completed_items and not inprogress_items:
+            continue
+
+        item_rows = ""
+        if completed_items:
+            names = "、".join([f"《{it['name']}》" for it in completed_items])
+            item_rows += (
+                "<div style='display:flex;align-items:center;gap:6px;margin-bottom:6px;'>"
+                f"<span style='background:#DCFCE7;color:#166534;font-size:10px;font-weight:700;"
+                f"padding:2px 7px;border-radius:99px;'>✓ 已完成 {len(completed_items)} 項</span>"
+                f"<span style='color:#64748B;font-size:11px;overflow:hidden;text-overflow:ellipsis;"
+                f"white-space:nowrap;max-width:200px;' title='{names}'>{names}</span>"
+                "</div>"
+            )
+
+        for it in inprogress_items:
+            prog = it.get("progress", 0.0)
+            ptype = inv.get("progress_type", "none")
+            inv_color = inv["color"]
+            if ptype == "pages" and it.get("total"):
+                tot = it["total"]
+                cur = prog * tot
+                label_val = f"{cur:.0f} / {tot:.0f} 頁"
+                pct_w = min(prog * 100, 100)
+            elif ptype == "percentage":
+                label_val = f"{prog * 100:.0f}%"
+                pct_w = min(prog * 100, 100)
+            else:
+                label_val = ""
+                pct_w = 0
+
+            progress_bar = ""
+            if ptype != "none" and pct_w > 0:
+                progress_bar = (
+                    "<div style='width:100%;height:5px;background:#E2E8F0;border-radius:3px;"
+                    "overflow:hidden;margin-top:3px;'>"
+                    f"<div style='width:{pct_w:.1f}%;height:100%;background:{inv_color};border-radius:3px;'></div>"
+                    "</div>"
+                )
+
+            right_part = (
+                f"<span style='color:{inv_color};font-family:monospace;font-size:11px;font-weight:700;'>{label_val}</span>"
+                if label_val else ""
+            )
+            item_rows += (
+                "<div style='margin-bottom:8px;'>"
+                "<div style='display:flex;justify-content:space-between;font-size:12px;'>"
+                f"<span style='color:#0F172A;'>《{it['name']}》</span>"
+                f"{right_part}"
+                "</div>"
+                f"{progress_bar}"
+                "</div>"
+            )
+
+        quant_sections += (
+            "<div style='margin-bottom:12px;'>"
+            "<div style='display:flex;align-items:center;gap:5px;margin-bottom:6px;'>"
+            f"{icon_svg}"
+            f"<span style='color:#0F172A;font-size:12px;font-weight:600;'>{inv['name']}</span>"
+            f"<span style='color:#94A3B8;font-size:11px;'>— {label}</span>"
+            "</div>"
+            f"{item_rows}"
+            "</div>"
+        )
+
+    quant_block = ""
+    if quant_sections:
+        quant_block = (
+            "<div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>"
+            "<div style='display: flex; flex-direction: column; gap: 4px;'>"
+            "<div style='color: #475569; font-size: 11px; font-weight: 700; font-family: monospace;"
+            "letter-spacing: 1px; margin-bottom: 8px;'>成果量化明細</div>"
+            f"{quant_sections}"
+            "</div>"
+        )
+
     date_str = datetime.now(ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%d %H:%M")
-    
-    return f"""
-        <div style='background: #F8FAFC; border-radius: 18px; padding: 24px; border: 1px solid rgba(200, 157, 69, 0.35); max-width: 420px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.08);'>
-            <div style='text-align: center;'>
-                <div style='color: #B48A2C; font-size: 13px; font-weight: 700; font-family: monospace; letter-spacing: 2px;'>TIMEVEST STATEMENT</div>
-                <div style='color: #0F172A; font-size: 18px; font-weight: 800; margin-top: 4px;'>個人自我投資對帳單</div>
-            </div>
-            
-            <div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>
-            
-            <div style='display: flex; flex-direction: column; gap: 10px;'>
-                <div style='display: flex; justify-content: space-between; font-size: 12px;'>
-                    <span style='color: #475569;'>結算時間</span>
-                    <span style='color: #0F172A; font-family: monospace;'>{date_str}</span>
-                </div>
-                <div style='display: flex; justify-content: space-between; font-size: 12px;'>
-                    <span style='color: #475569;'>累積投資總時數</span>
-                    <span style='color: #B48A2C; font-weight: 700; font-family: monospace;'>{h}h {m}m</span>
-                </div>
-                <div style='display: flex; justify-content: space-between; font-size: 12px;'>
-                    <span style='color: #475569;'>持續投資天數</span>
-                    <span style='color: #0F172A; font-family: monospace;'>{streak} 天</span>
-                </div>
-                <div style='display: flex; justify-content: space-between; font-size: 12px;'>
-                    <span style='color: #475569;'>增值最多項目</span>
-                    <span style='color: #B48A2C; font-weight: 700;'>{top_inv}</span>
-                </div>
-            </div>
-            
-            <div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>
-            
-            <div style='display: flex; flex-direction: column; gap: 8px;'>
-                <div style='color: #475569; font-size: 11px; font-weight: 700; font-family: monospace; letter-spacing: 1px; margin-bottom: 4px;'>資產分佈明細</div>
-                {detail_rows}
-            </div>
-            
-            <div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>
-            
-            <div style='text-align: center; display: flex; flex-direction: column; gap: 4px;'>
-                <div style='color: #B48A2C; font-size: 11px; font-style: italic; font-weight: 500;'>“時間是唯一無法被剝奪的真實資產。”</div>
-                <div style='color: #475569; font-size: 8px; font-weight: 700; font-family: monospace; letter-spacing: 2px;'>時光投資委員會認證印記</div>
-            </div>
-        </div>
-    """
+
+    return (
+        "<div style='background: #F8FAFC; border-radius: 18px; padding: 24px;"
+        "border: 1px solid rgba(200, 157, 69, 0.35); max-width: 420px; margin: 0 auto;"
+        "box-shadow: 0 10px 30px rgba(0,0,0,0.08);'>"
+        "<div style='text-align: center;'>"
+        "<div style='color: #B48A2C; font-size: 13px; font-weight: 700; font-family: monospace;"
+        "letter-spacing: 2px;'>TIMEVEST STATEMENT</div>"
+        "<div style='color: #0F172A; font-size: 18px; font-weight: 800; margin-top: 4px;'>"
+        "個人自我投資對帳單</div>"
+        "</div>"
+        "<div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>"
+        "<div style='display: flex; flex-direction: column; gap: 10px;'>"
+        f"<div style='display:flex;justify-content:space-between;font-size:12px;'>"
+        f"<span style='color:#475569;'>結算時間</span>"
+        f"<span style='color:#0F172A;font-family:monospace;'>{date_str}</span></div>"
+        f"<div style='display:flex;justify-content:space-between;font-size:12px;'>"
+        f"<span style='color:#475569;'>累積投資總時數</span>"
+        f"<span style='color:#B48A2C;font-weight:700;font-family:monospace;'>{h}h {m}m</span></div>"
+        f"<div style='display:flex;justify-content:space-between;font-size:12px;'>"
+        f"<span style='color:#475569;'>持續投資天數</span>"
+        f"<span style='color:#0F172A;font-family:monospace;'>{streak} 天</span></div>"
+        f"<div style='display:flex;justify-content:space-between;font-size:12px;'>"
+        f"<span style='color:#475569;'>增值最多項目</span>"
+        f"<span style='color:#B48A2C;font-weight:700;'>{top_inv}</span></div>"
+        "</div>"
+        "<div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>"
+        "<div style='display: flex; flex-direction: column; gap: 8px;'>"
+        "<div style='color: #475569; font-size: 11px; font-weight: 700; font-family: monospace;"
+        "letter-spacing: 1px; margin-bottom: 4px;'>資產分佈明細</div>"
+        f"{detail_rows}"
+        "</div>"
+        f"{quant_block}"
+        "<div style='border-top: 1px dashed #CBD5E1; margin: 16px 0;'></div>"
+        "<div style='text-align: center; display: flex; flex-direction: column; gap: 4px;'>"
+        "<div style='color: #B48A2C; font-size: 11px; font-style: italic; font-weight: 500;'>"
+        "\u201c\u6642\u9593\u662f\u552f\u4e00\u7121\u6cd5\u88ab\u5265\u5955\u7684\u771f\u5be6\u8cc7\u7522\u3002\u201d</div>"
+        "<div style='color: #475569; font-size: 8px; font-weight: 700; font-family: monospace;"
+        "letter-spacing: 2px;'>時光投資委員會認證印記</div>"
+        "</div>"
+        "</div>"
+    )
 
 def get_milestone_list_html(m_type=None, start_date=None, end_date=None):
     filtered = service.milestones
