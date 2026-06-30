@@ -523,3 +523,30 @@ class TimeVestService:
         except Exception as e:
             print(f"Error deleting BQ row: {e}")
             return False, f"刪除失敗：{e}"
+
+    def update_item_progress_and_total(self, item_id, current_val, total_val=None, status=None):
+        item = next((it for it in self.items if it["id"] == item_id), None)
+        if not item:
+            return False, "項目不存在"
+        inv = next((i for i in self.investments if i["id"] == item["investment_id"]), None)
+        if not inv:
+            return False, "帳戶不存在"
+            
+        if total_val is not None:
+            item["total"] = total_val
+            
+        if inv["progress_type"] == "pages" and item.get("total"):
+            item["progress"] = min(float(current_val) / float(item["total"]), 1.0)
+        elif inv["progress_type"] == "percentage":
+            item["progress"] = min(float(current_val) / 100.0, 1.0)
+            
+        if status:
+            item["status"] = status
+            if status == "completed":
+                item["progress"] = 1.0
+                item["completed_at"] = datetime.datetime.now(ZoneInfo("Asia/Taipei")).isoformat()
+            else:
+                item.pop("completed_at", None)
+                
+        save_json(ITEMS_FILE, self.items)
+        return True, "已成功更新項目進度！"

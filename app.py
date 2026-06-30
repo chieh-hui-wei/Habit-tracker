@@ -938,6 +938,37 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
                         hist_delete_btn = gr.Button("刪除此筆歷史紀錄", variant="stop")
                     hist_update_status = gr.Markdown()
 
+            # Update item progress panel
+            with gr.Group(elem_classes="custom-card"):
+                gr.Markdown("### 更新項目進度")
+                with gr.Row():
+                    update_item_inv_dropdown = gr.Dropdown(
+                        choices=get_investment_choices(),
+                        label="選擇投資帳戶",
+                        value=service.investments[0]["name"] if service.investments else None
+                    )
+                    
+                    # Populate initial choices
+                    _init_upd_choices = []
+                    if service.investments:
+                        _init_upd_items = service.get_items(inv_id=service.investments[0]["id"])
+                        _init_upd_choices = [it["name"] for it in _init_upd_items]
+                        
+                    update_item_dropdown = gr.Dropdown(
+                        choices=_init_upd_choices,
+                        label="選擇項目"
+                    )
+                with gr.Row():
+                    update_item_progress = gr.Textbox(label="當前進度值 (頁數或百分比)", placeholder="例如: 180 或 45")
+                    update_item_total = gr.Textbox(label="總頁數 (若無則修改，空白代表不修改)", placeholder="例如: 300")
+                    update_item_status_radio = gr.Radio(
+                        choices=[("進行中", "inProgress"), ("已完成", "completed"), ("暫停中", "paused")],
+                        value="inProgress",
+                        label="項目狀態"
+                    )
+                update_item_btn = gr.Button("更新進度", variant="primary")
+                update_item_status = gr.Markdown()
+
             # Delete item panel
             with gr.Group(elem_classes="custom-card"):
                 gr.Markdown("### 刪除追蹤項目")
@@ -1381,6 +1412,95 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         fn=sync_dropdowns_after_delete,
         inputs=[delete_item_inv_dropdown],
         outputs=[delete_item_dropdown, item_dropdown, manual_item_dropdown]
+    )
+
+    # Update Item Progress handlers
+    def update_item_change_inv(inv_name):
+        inv = next((i for i in service.investments if i["name"] == inv_name), None)
+        if not inv:
+            return gr.update(choices=[])
+        items = service.get_items(inv_id=inv["id"])
+        choices = [it["name"] for it in items]
+        return gr.update(choices=choices, value=choices[0] if choices else None)
+
+    def load_selected_item_for_update(inv_name, item_name):
+        if not item_name:
+            return "", "", "inProgress"
+        inv = next((i for i in service.investments if i["name"] == inv_name), None)
+        if not inv:
+            return "", "", "inProgress"
+        item = next((it for it in service.items if it["investment_id"] == inv["id"] and it["name"] == item_name), None)
+        if not item:
+            return "", "", "inProgress"
+            
+        prog_type = inv["progress_type"]
+        prog_val = ""
+        tot_val = ""
+        if prog_type == "pages" and item.get("total"):
+            prog_val = f"{item['progress'] * item['total']:.0f}"
+            tot_val = f"{item['total']:.0f}"
+        elif prog_type == "percentage":
+            prog_val = f"{item['progress'] * 100:.0f}"
+            
+        return prog_val, tot_val, item["status"]
+
+    def run_update_item_progress(inv_name, item_name, progress_val, total_val, status_val):
+        if not item_name:
+            return "請選擇要更新的項目"
+        inv = next((i for i in service.investments if i["name"] == inv_name), None)
+        if not inv:
+            return "帳戶不存在"
+        item = next((it for it in service.items if it["investment_id"] == inv["id"] and it["name"] == item_name), None)
+        if not item:
+            return "項目不存在"
+            
+        t_val = None
+        if total_val.strip():
+            try:
+                t_val = float(total_val)
+            except ValueError:
+                pass
+                
+        success, msg = service.update_item_progress_and_total(
+            item_id=item["id"],
+            current_val=float(progress_val) if progress_val.strip() else 0.0,
+            total_val=t_val,
+            status=status_val
+        )
+        return msg
+
+    def sync_dropdowns_after_update(inv_name):
+        inv = next((i for i in service.investments if i["name"] == inv_name), None)
+        if not inv:
+            return gr.update(choices=[], visible=False), gr.update(choices=[], visible=False)
+        items = service.get_items(inv_id=inv["id"])
+        prog_items = [it["name"] for it in items if it["status"] == "inProgress"]
+        all_item_names = [it["name"] for it in items]
+        return (
+            gr.update(choices=prog_items, visible=bool(inv["item_label"] and prog_items)),
+            gr.update(choices=all_item_names, visible=bool(inv["item_label"]))
+        )
+
+    update_item_inv_dropdown.change(
+        fn=update_item_change_inv,
+        inputs=[update_item_inv_dropdown],
+        outputs=[update_item_dropdown]
+    )
+
+    update_item_dropdown.change(
+        fn=load_selected_item_for_update,
+        inputs=[update_item_inv_dropdown, update_item_dropdown],
+        outputs=[update_item_progress, update_item_total, update_item_status_radio]
+    )
+
+    update_item_btn.click(
+        fn=run_update_item_progress,
+        inputs=[update_item_inv_dropdown, update_item_dropdown, update_item_progress, update_item_total, update_item_status_radio],
+        outputs=[update_item_status]
+    ).then(
+        fn=sync_dropdowns_after_update,
+        inputs=[update_item_inv_dropdown],
+        outputs=[item_dropdown, manual_item_dropdown]
     )
 
     # Tab 4 actions: Settings
