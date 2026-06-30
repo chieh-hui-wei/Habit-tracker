@@ -81,11 +81,8 @@ def get_icon_svg(icon_name, color="#475569"):
     }
     return svgs.get(icon_name, "")
 
-def get_banner_html(year_str="全部", month_str="全部"):
-    year = int(year_str) if year_str != "全部" else None
-    month = int(month_str) if month_str != "全部" else None
-    
-    stats = service.get_portfolio_summary(year=year, month=month)
+def get_banner_html(start_date=None, end_date=None):
+    stats = service.get_portfolio_summary(start_date=start_date, end_date=end_date)
     total = stats["total_hours"]
     today = stats["today_hours"]
     streak = stats["streak_days"]
@@ -95,7 +92,7 @@ def get_banner_html(year_str="全部", month_str="全部"):
     
     total_formatted = f"<span class='monospace-num' style='font-size: 46px; color: #B48A2C;'>{h}</span><span style='font-size: 20px; color: #475569; margin-left: 2px; margin-right: 6px;'>h</span><span class='monospace-num' style='font-size: 46px; color: #B48A2C;'>{m:02d}</span><span style='font-size: 20px; color: #475569; margin-left: 2px;'>m</span>"
     
-    if year or month:
+    if start_date or end_date:
         left_box_label = "投入天數"
         left_box_val = f"{stats['active_days']} 天"
     else:
@@ -122,11 +119,13 @@ def get_banner_html(year_str="全部", month_str="全部"):
         </div>
     """
 
-def get_allocation_html(year_str="全部", month_str="全部"):
-    year = int(year_str) if year_str != "全部" else None
-    month = int(month_str) if month_str != "全部" else None
-    
-    allocations = service.get_allocation(year=year, month=month)
+def get_allocation_html(start_date=None, end_date=None):
+    if not start_date:
+        start_date = (datetime.now(ZoneInfo("Asia/Taipei")) - timedelta(days=30)).strftime("%Y-%m-%d")
+    if not end_date:
+        end_date = datetime.now(ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%d")
+        
+    allocations = service.get_allocation(start_date=start_date, end_date=end_date)
     if not allocations:
         return "<div style='color: #475569; font-size: 13px; text-align: center; padding: 20px;'>尚無投入數據以進行配置分析</div>"
     
@@ -743,15 +742,41 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         """
     )
 
-    # Top Stats Dashboard Row
+    # Top Stats Dashboard Row (Portfolio Summary)
     with gr.Row(elem_classes="custom-card", equal_height=True):
-        with gr.Column(scale=4):
+        with gr.Column(scale=8):
             banner_view = gr.HTML(value=get_banner_html())
-        with gr.Column(scale=6):
+        with gr.Column(scale=4, min_width=150):
+            gr.Markdown("#### 專注資產總額篩選")
+            banner_start_date = gr.Textbox(
+                label="開始日期 (YYYY-MM-DD)", 
+                value="", 
+                placeholder="例如: 2026-06-01 (空白為全部)"
+            )
+            banner_end_date = gr.Textbox(
+                label="結束日期 (YYYY-MM-DD)", 
+                value="", 
+                placeholder="例如: 2026-06-30 (空白為全部)"
+            )
+            banner_refresh_btn = gr.Button("更新總額統計", variant="secondary")
+
+    # Bottom Stats Dashboard Row (Asset Allocation Distribution)
+    with gr.Row(elem_classes="custom-card", equal_height=True):
+        with gr.Column(scale=8):
             allocation_view = gr.HTML(value=get_allocation_html())
-        with gr.Column(scale=2, min_width=150):
-            year_dropdown = gr.Dropdown(choices=["全部", "2026", "2025", "2024"], value="全部", label="選擇年份", interactive=True)
-            month_dropdown = gr.Dropdown(choices=["全部", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], value="全部", label="選擇月份", interactive=True)
+        with gr.Column(scale=4, min_width=150):
+            gr.Markdown("#### 時間資產配置篩選")
+            alloc_start_date = gr.Textbox(
+                label="開始日期 (YYYY-MM-DD)", 
+                value=(datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"), 
+                placeholder="例如: 2026-06-01"
+            )
+            alloc_end_date = gr.Textbox(
+                label="結束日期 (YYYY-MM-DD)", 
+                value=datetime.now().strftime("%Y-%m-%d"), 
+                placeholder="例如: 2026-06-30"
+            )
+            alloc_refresh_btn = gr.Button("更新配置比例", variant="secondary")
 
     with gr.Tabs():
         # Tab 1: Circular Stopwatch Tracking Card (timer section)
@@ -1051,15 +1076,15 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
     )
 
     # Confirm settle
-    def complete_settle_workflow(progress_val, total_val, remarks_val, settle_status_val, year_val, month_val):
+    def complete_settle_workflow(progress_val, total_val, remarks_val, settle_status_val, banner_start_val, banner_end_val, alloc_start_val, alloc_end_val):
         msg = settle_timer(progress_val, total_val, remarks_val, settle_status_val)
-        banner = get_banner_html(year_val, month_val)
-        alloc = get_allocation_html(year_val, month_val)
+        banner = get_banner_html(banner_start_val.strip(), banner_end_val.strip())
+        alloc = get_allocation_html(alloc_start_val.strip(), alloc_end_val.strip())
         return msg, banner, alloc, gr.update(active=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), get_stopwatch_html("00:00"), "準備投資"
 
     settle_btn.click(
         fn=complete_settle_workflow,
-        inputs=[settle_progress, settle_total, remarks, settle_status, year_dropdown, month_dropdown],
+        inputs=[settle_progress, settle_total, remarks, settle_status, banner_start_date, banner_end_date, alloc_start_date, alloc_end_date],
         outputs=[timer_msg, banner_view, allocation_view, stopwatch_trigger, settle_progress, settle_total, settle_status, stopwatch_display, timer_msg]
     )
 
@@ -1071,21 +1096,24 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         outputs=[stopwatch_trigger, stopwatch_display, timer_msg, settle_progress, settle_total, settle_status]
     )
 
-    # Refresh dashboard
-    def update_dashboard(year, month):
-        banner = get_banner_html(year, month)
-        alloc = get_allocation_html(year, month)
-        return banner, alloc
+    # Refresh banner total
+    def update_banner(start_d, end_d):
+        return get_banner_html(start_d.strip(), end_d.strip())
 
-    year_dropdown.change(
-        fn=update_dashboard,
-        inputs=[year_dropdown, month_dropdown],
-        outputs=[banner_view, allocation_view]
+    banner_refresh_btn.click(
+        fn=update_banner,
+        inputs=[banner_start_date, banner_end_date],
+        outputs=[banner_view]
     )
-    month_dropdown.change(
-        fn=update_dashboard,
-        inputs=[year_dropdown, month_dropdown],
-        outputs=[banner_view, allocation_view]
+
+    # Refresh allocation chart
+    def update_allocation(start_d, end_d):
+        return get_allocation_html(start_d.strip(), end_d.strip())
+
+    alloc_refresh_btn.click(
+        fn=update_allocation,
+        inputs=[alloc_start_date, alloc_end_date],
+        outputs=[allocation_view]
     )
 
     # Manual entry

@@ -201,13 +201,17 @@ class TimeVestService:
         return newly_unlocked
 
     # --- Stats & Query Summaries ---
-    def get_portfolio_summary(self, year=None, month=None):
+    def get_portfolio_summary(self, year=None, month=None, start_date=None, end_date=None):
         # We query BigQuery for overall stats to avoid drift
         where_clause = "WHERE 1=1"
         if year:
             where_clause += f" AND EXTRACT(YEAR FROM start_time) = {year}"
         if month:
             where_clause += f" AND EXTRACT(MONTH FROM start_time) = {month}"
+        if start_date:
+            where_clause += f" AND DATE(start_time) >= '{start_date}'"
+        if end_date:
+            where_clause += f" AND DATE(start_time) <= '{end_date}'"
 
         query = f"""
             SELECT SUM(duration_second) as total_sec, COUNT(DISTINCT DATE(start_time)) as active_days
@@ -291,12 +295,16 @@ class TimeVestService:
             print(f"Streak calculation failed: {e}")
             return 0
 
-    def get_allocation(self, year=None, month=None):
+    def get_allocation(self, year=None, month=None, start_date=None, end_date=None):
         where_clause = "WHERE 1=1"
         if year:
             where_clause += f" AND EXTRACT(YEAR FROM start_time) = {year}"
         if month:
             where_clause += f" AND EXTRACT(MONTH FROM start_time) = {month}"
+        if start_date:
+            where_clause += f" AND DATE(start_time) >= '{start_date}'"
+        if end_date:
+            where_clause += f" AND DATE(start_time) <= '{end_date}'"
 
         query = f"""
             SELECT habit_name, SUM(duration_second) as total_sec
