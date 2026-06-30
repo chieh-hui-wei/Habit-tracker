@@ -498,6 +498,33 @@ def dynamic_update_items_dropdown(inv_name):
     items = service.get_items(inv_id=inv["id"], status="inProgress")
     return gr.update(choices=[it["name"] for it in items], visible=True, label=inv["item_label"])
 
+def get_timer_item_panel_state(inv_name):
+    """Returns (item_dropdown update, warning_html update, quick_add_group update, quick_add_label) """
+    inv = next((i for i in service.investments if i["name"] == inv_name), None)
+    if not inv or not inv["item_label"]:
+        return (
+            gr.update(choices=[], visible=False, label="項目"),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            inv["item_label"] if inv and inv["item_label"] else "項目"
+        )
+    label = inv["item_label"]
+    items = service.get_items(inv_id=inv["id"], status="inProgress")
+    if items:
+        return (
+            gr.update(choices=[it["name"] for it in items], visible=True, label=f"選擇{label}"),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            label
+        )
+    else:
+        return (
+            gr.update(choices=[], visible=False, label=f"選擇{label}"),
+            gr.update(visible=True, value=f"<div style='display:flex;align-items:center;gap:8px;padding:10px 14px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;font-size:13px;color:#92400E;'>⚠️ 目前無進行中的{label}，請先新增。</div>"),
+            gr.update(visible=True),
+            label
+        )
+
 def dynamic_update_all_items_dropdown():
     return gr.update(choices=[it["name"] for it in service.items])
 
@@ -634,26 +661,45 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
         with gr.TabItem("專注計時"):
             with gr.Group(elem_classes="custom-card"):
                 gr.Markdown("### 專注時間注入")
-                
-                # Active investment setup
-                with gr.Row():
-                    invest_dropdown = gr.Dropdown(
-                        choices=get_investment_choices(),
-                        label="選擇投資帳戶",
-                        value=service.investments[0]["name"] if service.investments else None,
-                        interactive=True
-                    )
-                    item_dropdown = gr.Dropdown(
-                        choices=[],
-                        label="項目",
-                        visible=False,
-                        interactive=True
-                    )
+
+                # --- Account selector ---
+                invest_dropdown = gr.Dropdown(
+                    choices=get_investment_choices(),
+                    label="選擇投資帳戶",
+                    value=service.investments[0]["name"] if service.investments else None,
+                    interactive=True
+                )
+
+                # --- Item selector (shown only when account has item_label) ---
+                # Compute initial state
+                _init_inv = service.investments[0] if service.investments else None
+                _init_items = service.get_items(inv_id=_init_inv["id"], status="inProgress") if (_init_inv and _init_inv["item_label"]) else []
+                _init_has_label = bool(_init_inv and _init_inv["item_label"])
+                _init_label = _init_inv["item_label"] if _init_has_label else "項目"
+
+                item_dropdown = gr.Dropdown(
+                    choices=[it["name"] for it in _init_items] if _init_items else [],
+                    label=f"選擇{_init_label}" if _init_has_label else "項目",
+                    visible=_init_has_label and bool(_init_items),
+                    interactive=True
+                )
+
+                # Warning: account has item_label but no in-progress items
+                timer_item_warning = gr.HTML(
+                    value=f"<div style='display:flex;align-items:center;gap:8px;padding:10px 14px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;font-size:13px;color:#92400E;'>⚠️ 目前無進行中的{_init_label}，請先新增。</div>" if (_init_has_label and not _init_items) else "",
+                    visible=_init_has_label and not bool(_init_items)
+                )
+
+                # Inline quick-add (appears when no items)
+                with gr.Group(visible=_init_has_label and not bool(_init_items)) as timer_quick_add_group:
+                    with gr.Row():
+                        timer_quick_item_name = gr.Textbox(label=f"新增{_init_label}", placeholder=f"輸入{_init_label}名稱…", scale=4)
+                        timer_quick_add_btn = gr.Button("＋ 新增", variant="secondary", scale=1)
 
                 # Action timer state
                 stopwatch_display = gr.HTML(value=get_stopwatch_html("00:00"))
                 timer_msg = gr.Textbox(label="當前狀態", value="準備投資", interactive=False)
-                
+
                 # Dynamic inputs during timer or settlement
                 with gr.Group(visible=True) as settle_panel:
                     gr.Markdown("#### 結算投入進度")
@@ -781,9 +827,30 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
 
     # Event handlers: Dropdown linkages
     invest_dropdown.change(
-        fn=dynamic_update_items_dropdown,
+        fn=get_timer_item_panel_state,
         inputs=[invest_dropdown],
-        outputs=[item_dropdown]
+        outputs=[item_dropdown, timer_item_warning, timer_quick_add_group, timer_quick_item_name]
+    )
+
+    # Inline quick-add item from the Focus Timer tab
+    def timer_quick_add_item(inv_name, item_name):
+        inv = next((i for i in service.investments if i["name"] == inv_name), None)
+        if not inv or not item_name.strip():
+            return gr.update(), gr.update(), gr.update(), ""
+        service.add_item(inv["id"], item_name.strip(), None)
+        items = service.get_items(inv_id=inv["id"], status="inProgress")
+        label = inv["item_label"] or "項目"
+        return (
+            gr.update(choices=[it["name"] for it in items], visible=True, label=f"選擇{label}"),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            ""
+        )
+
+    timer_quick_add_btn.click(
+        fn=timer_quick_add_item,
+        inputs=[invest_dropdown, timer_quick_item_name],
+        outputs=[item_dropdown, timer_item_warning, timer_quick_add_group, timer_quick_item_name]
     )
 
     manual_invest_dropdown.change(
