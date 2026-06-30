@@ -5,6 +5,8 @@ import datetime
 from zoneinfo import ZoneInfo
 from google.cloud import bigquery
 from google.api_core.exceptions import NotFound
+import pandas as pd
+
 
 # JSON database files
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -214,10 +216,18 @@ class TimeVestService:
         """
         try:
             df = self.bq_client.query(query).to_dataframe()
-            total_hours = float(df['total_sec'].iloc[0] or 0) / 3600.0
+            val = df['total_sec'].iloc[0]
+            if val is None or pd.isna(val):
+                total_hours = 0.0
+            else:
+                total_hours = float(val) / 3600.0
             
             # calculate active days as simple streak or count
-            active_days = int(df['active_days'].iloc[0] or 0)
+            active_val = df['active_days'].iloc[0]
+            if active_val is None or pd.isna(active_val):
+                active_days = 0
+            else:
+                active_days = int(active_val)
         except Exception as e:
             print(f"BQ query failed: {e}")
             total_hours = 0.0
@@ -235,7 +245,11 @@ class TimeVestService:
         """
         try:
             df_today = self.bq_client.query(query_today).to_dataframe()
-            today_hours = float(df_today['today_sec'].iloc[0] or 0) / 3600.0
+            val_today = df_today['today_sec'].iloc[0]
+            if val_today is None or pd.isna(val_today):
+                today_hours = 0.0
+            else:
+                today_hours = float(val_today) / 3600.0
         except Exception as e:
             print(f"BQ query today failed: {e}")
             today_hours = 0.0
@@ -313,6 +327,23 @@ class TimeVestService:
         # 1. Clear existing automatically generated monthlyAchievement milestones to prevent duplicates
         self.milestones = [m for m in self.milestones if m.get("type") != "monthlyAchievement"]
 
+        # 2. Check completed items milestones (成果型) from items.json
+        for item in self.items:
+            if item.get("status") == "completed":
+                inv = next((i for i in self.investments if i["id"] == item["investment_id"]), None)
+                milestone_title = f"項目結清：《{item['name']}》"
+                if not any(m["title"] == milestone_title for m in self.milestones):
+                    label = inv["item_label"] if inv and inv["item_label"] else "項目"
+                    m = {
+                        "id": str(uuid.uuid4()),
+                        "title": milestone_title,
+                        "description": f"卓越的成果！你已成功結算【{inv['name'] if inv else '自我投資'}】中的 {label}——《{item['name']}》！",
+                        "type": "completion",
+                        "investment_id": item["investment_id"],
+                        "date_unlocked": item.get("completed_at", datetime.datetime.now(ZoneInfo("Asia/Taipei")).isoformat())
+                    }
+                    self.milestones.append(m)
+
         query = f"""
             SELECT 
                 FORMAT_TIMESTAMP('%Y-%m', start_time) as month,
@@ -350,11 +381,11 @@ class TimeVestService:
 
             def normalize_habit_name(name):
                 if "閱讀" in name:
-                    return "日常閱讀"
+                    return "閱讀"
                 if "健身" in name or "Gym" in name or "Strength" in name:
-                    return "Gym"
+                    return "健身"
                 if "吉他" in name:
-                    return "吉他練習"
+                    return "吉他"
                 return name
 
             for month_str, rows in sorted(by_month.items(), reverse=True):
@@ -370,8 +401,8 @@ class TimeVestService:
 
                 for habit_name, r_list in habit_groups.items():
                     inv = next((i for i in self.investments if i["name"] == habit_name), None)
-                    if habit_name == "吉他練習" and not inv:
-                        inv = {"name": "吉他練習", "item_label": "曲目", "progress_type": "percentage"}
+                    if habit_name == "吉他" and not inv:
+                        inv = {"name": "吉他", "item_label": "曲目", "progress_type": "percentage"}
 
                     if not inv or not inv.get("item_label"):
                         sub_sec = sum(r['duration_sec'] for r in r_list)
@@ -430,3 +461,44 @@ class TimeVestService:
             save_json(MILESTONES_FILE, self.milestones)
         except Exception as e:
             print(f"Monthly summary engine failed: {e}")
+
+    def get_activities_by_range(self, start_date, end_date, habit_name):
+        query = f"""
+            SELECT id, start_time, habit_name, detail, item_name, progress_snapshot, total_pages, duration_second
+            FROM `{self.table_id}`
+            WHERE DATE(start_time) >= '{start_date}' AND DATE(start_time) <= '{end_date}'
+              AND habit_name = '{habit_name}'
+            ORDER BY start_time DESC
+        """
+        try:
+            df = self.bq_client.query(query).to_dataframe()
+            # Clean up NaN / NaT for JSON serialization
+            df = df.where(pd.notnull(df), None)
+            # Convert start_time timestamp to string
+            df['start_time'] = df['start_time'].apply(lambda x: str(x) if x else None)
+            return df.to_dict('records')
+        except Exception as e:
+            print(f"Error fetching activities: {e}")
+            return []
+
+    def update_historical_activity(self, row_id, start_date, item_name, progress_snapshot, total_pages, detail):
+        prog_sql = f"{progress_snapshot}" if progress_snapshot is not None else "NULL"
+        tot_sql = f"{total_pages}" if total_pages is not None else "NULL"
+        item_sql = f"'{item_name}'" if item_name else "NULL"
+        detail_sql = f"'{detail}'" if detail else "NULL"
+
+        query = f"""
+            UPDATE `{self.table_id}`
+            SET item_name = {item_sql},
+                progress_snapshot = {prog_sql},
+                total_pages = {tot_sql},
+                detail = {detail_sql}
+            WHERE id = '{row_id}' AND DATE(start_time) = '{start_date}'
+        """
+        try:
+            query_job = self.bq_client.query(query)
+            query_job.result()
+            return True, "歷史紀錄已成功更新！"
+        except Exception as e:
+            print(f"Error updating BQ row: {e}")
+            return False, f"更新失敗：{e}"

@@ -1,7 +1,7 @@
 [
     {
         "id": "e2b65900-1111-2222-3333-444455556666",
-        "name": "日常閱讀",
+        "name": "閱讀",
         "icon": "book.fill",
         "color": "#E2B659",
         "item_label": "書籍",
@@ -10,11 +10,20 @@
     },
     {
         "id": "b8e23ed9-be48-43bd-b791-a9ba3c530539",
-        "name": "Gym",
+        "name": "健身",
         "icon": "dumbbell.fill",
         "color": "#E2B659",
         "item_label": null,
         "progress_type": "none",
+        "total_duration": 0
+    },
+    {
+        "id": "c7a8b643-5a3a-4f5c-9b6d-76a8b643e534",
+        "name": "吉他",
+        "icon": "guitars.fill",
+        "color": "#E2B659",
+        "item_label": "曲目",
+        "progress_type": "percentage",
         "total_duration": 0
     }
 ]
