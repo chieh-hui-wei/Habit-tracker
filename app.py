@@ -1078,6 +1078,7 @@ with gr.Blocks(theme=theme, css=custom_css, title="時光投資簿 timeVest") as
     )
 
     def generate_yields_report(tab, start_d, end_d):
+        service.check_and_generate_monthly_summaries()
         if tab == "成果匯報":
             return get_milestone_list_html(m_type="completion")
         else:

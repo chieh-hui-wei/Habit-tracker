@@ -309,40 +309,124 @@ class TimeVestService:
         return allocations
 
     def check_and_generate_monthly_summaries(self):
-        """Automatically checks BQ for missing monthly summaries and creates them."""
+        """Automatically checks BQ for monthly summaries, clears old duplicates, and creates rich quantified summaries."""
+        # 1. Clear existing automatically generated monthlyAchievement milestones to prevent duplicates
+        self.milestones = [m for m in self.milestones if m.get("type") != "monthlyAchievement"]
+
         query = f"""
             SELECT 
                 FORMAT_TIMESTAMP('%Y-%m', start_time) as month,
-                SUM(duration_second) as total_sec,
-                COUNT(DISTINCT item_name) as items_touched
+                habit_name,
+                item_name,
+                detail,
+                MAX(progress_snapshot) as max_prog,
+                SUM(duration_second) as duration_sec
             FROM `{self.table_id}`
-            GROUP BY month
+            GROUP BY month, habit_name, item_name, detail
             ORDER BY month DESC
         """
         try:
             df = self.bq_client.query(query).to_dataframe()
-            existing_months = {m["title"].split("：")[0].replace("📊 ", "").replace("📊", "").strip() for m in self.milestones if m["type"] == "monthlyAchievement"}
-            
+            if df.empty:
+                return
+
+            import collections
+            by_month = collections.defaultdict(list)
             for _, row in df.iterrows():
-                month_str = row['month'] # e.g. "2026-06"
-                if month_str in existing_months:
-                    continue
-                
-                # Check if this month is already completed
-                current_month = datetime.datetime.now().strftime("%Y-%m")
-                if month_str == current_month:
-                    continue # Do not close out current active month yet
-                
-                total_hours = float(row['total_sec']) / 3600.0
+                by_month[row['month']].append(row)
+
+            def get_unit_by_label(label):
+                if not label:
+                    return "個"
+                if "書" in label:
+                    return "本"
+                if "曲" in label:
+                    return "首"
+                if "課" in label:
+                    return "門"
+                if "運" in label or "健身" in label:
+                    return "次"
+                return "項"
+
+            def normalize_habit_name(name):
+                if "閱讀" in name:
+                    return "日常閱讀"
+                if "健身" in name or "Gym" in name or "Strength" in name:
+                    return "Gym"
+                if "吉他" in name:
+                    return "吉他練習"
+                return name
+
+            for month_str, rows in sorted(by_month.items(), reverse=True):
+                total_sec = sum(r['duration_sec'] for r in rows)
+                total_hours = total_sec / 3600.0
+
+                habit_groups = collections.defaultdict(list)
+                for r in rows:
+                    norm_name = normalize_habit_name(r['habit_name'])
+                    habit_groups[norm_name].append(r)
+
+                desc_parts = [f"在 {month_str} 中，你累計向自我專注投資了 {total_hours:.1f} 小時，穩步增值你的時間資產。"]
+
+                for habit_name, r_list in habit_groups.items():
+                    inv = next((i for i in self.investments if i["name"] == habit_name), None)
+                    if habit_name == "吉他練習" and not inv:
+                        inv = {"name": "吉他練習", "item_label": "曲目", "progress_type": "percentage"}
+
+                    if not inv or not inv.get("item_label"):
+                        sub_sec = sum(r['duration_sec'] for r in r_list)
+                        desc_parts.append(f"• {habit_name}：投入 {sub_sec/3600.0:.1f} 小時。")
+                        continue
+
+                    label = inv["item_label"]
+                    unit = get_unit_by_label(label)
+
+                    completed_items = []
+                    inprogress_items = []
+
+                    for r in r_list:
+                        it_name = r['item_name'] or r['detail']
+                        if not it_name or any(keyword in it_name for keyword in ["投入", "北歐時間", "Garmin", "準備投資"]):
+                            continue
+
+                        is_completed = False
+                        if r['max_prog'] is not None and float(r['max_prog']) >= 1.0:
+                            is_completed = True
+
+                        if is_completed:
+                            completed_items.append(it_name)
+                        else:
+                            inprogress_items.append(it_name)
+
+                    sub_sec = sum(r['duration_sec'] for r in r_list)
+                    habit_desc = f"• {habit_name}：投入 {sub_sec/3600.0:.1f} 小時"
+
+                    detail_pieces = []
+                    if completed_items:
+                        detail_pieces.append(f"已完成 {len(completed_items)} {unit}{label}（{', '.join(completed_items)}）")
+                    if inprogress_items:
+                        detail_pieces.append(f"投入 {len(inprogress_items)} {unit}{label}（{', '.join(inprogress_items)}）")
+
+                    if detail_pieces:
+                        habit_desc += "，" + "；".join(detail_pieces) + "。"
+                    else:
+                        habit_desc += "。"
+
+                    desc_parts.append(habit_desc)
+
+                description = "\n".join(desc_parts)
+
                 m = {
                     "id": str(uuid.uuid4()),
-                    "title": f"{month_str} 資產月報",
-                    "description": f"在 {month_str} 中，你累計向自我專注投資了 {total_hours:.1f} 小時，穩步增值你的時間資產。",
+                    "title": f"📊 {month_str} 資產月報",
+                    "description": description,
                     "type": "monthlyAchievement",
                     "investment_id": None,
-                    "date_unlocked": datetime.datetime.now().isoformat()
+                    "date_unlocked": datetime.datetime.now(ZoneInfo("Asia/Taipei")).isoformat()
                 }
                 self.milestones.append(m)
-                save_json(MILESTONES_FILE, self.milestones)
+
+            self.milestones.sort(key=lambda x: x["date_unlocked"], reverse=True)
+            save_json(MILESTONES_FILE, self.milestones)
         except Exception as e:
             print(f"Monthly summary engine failed: {e}")
